@@ -5,6 +5,8 @@
  * 5 级渐变：浅蓝灰 → 淡蓝 → 橙黄 → 橙红 → 亮红
  */
 
+import * as THREE from 'three';
+
 // 性能等级对应的颜色（4 级渐变）
 const PERFORMANCE_COLORS = [
   0xFF0000,  // 夯爆了 (0-25 分) - 亮红色
