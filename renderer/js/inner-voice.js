@@ -110,7 +110,12 @@ class InnerVoiceManager {
    * @param {object} data - 性能数据
    */
   async generateInnerVoice(data) {
-    const { score, level, cpu, memory, gpu, gpu_temp } = data;
+    const score = data.performance_score || 100;
+    const level = data.performance_level || '空闲';
+    const cpu = data.cpu || 0;
+    const memory = data.memory || 0;
+    const gpu = data.gpu || 0;
+    const gpu_temp = data.gpu_temp || 0;
     
     console.log(`💭 生成内心戏：${level} (${score.toFixed(1)}分)`);
     
