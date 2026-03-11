@@ -612,7 +612,12 @@ function connectWebSocket() {
   }
   
   try {
+    // 尝试连接默认端口 8765，失败则使用 8767
     websocket = new WebSocket('ws://localhost:8765');
+    websocket.on('error', () => {
+      // 8765 失败，尝试 8767
+      websocket = new WebSocket('ws://localhost:8767');
+    });
     websocketConnectCount = 0;
     
     websocket.onopen = () => {
