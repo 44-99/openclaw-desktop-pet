@@ -28,7 +28,8 @@ let electronProcess: ChildProcess | null = null;
 let pythonProcess: ChildProcess | null = null;
 
 function getExtensionRoot() {
-  return path.join(__dirname, '..');
+  // __dirname 已经是 index.ts 所在目录
+  return __dirname;
 }
 
 function resolveElectronCommand() {
@@ -62,6 +63,7 @@ function resolvePythonCommand() {
     const candidates = [
       path.join(extensionRoot, '.venv', 'Scripts', 'python.exe'),
       path.join(userOpenClawRoot, '.venv', 'Scripts', 'python.exe'),
+      'python',  // 使用系统 Python
     ];
 
     for (const candidate of candidates) {
@@ -76,6 +78,7 @@ function resolvePythonCommand() {
   const candidates = [
     path.join(extensionRoot, '.venv', 'bin', 'python3'),
     path.join(userOpenClawRoot, '.venv', 'bin', 'python3'),
+    'python3',
   ];
 
   for (const candidate of candidates) {
