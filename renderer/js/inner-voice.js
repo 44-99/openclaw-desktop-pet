@@ -75,10 +75,19 @@ class InnerVoiceManager {
       return;
     }
     
-    // 检查等级是否变化
+    // 检查等级是否变化，或者固定时间间隔触发（60 秒）
+    const timeSinceLastTrigger = now - this.lastTriggerTime;
+    const shouldTriggerByLevel = this.lastLevel !== null && data.performance_level !== this.lastLevel;
+    const shouldTriggerByTime = timeSinceLastTrigger > 60000; // 60 秒强制触发一次
+    
     console.log(`💭 当前等级：${data.performance_level}, 上次等级：${this.lastLevel || '未设置'}`);
-    if (this.lastLevel !== null && data.performance_level !== this.lastLevel) {
-      console.log(`💭 等级变化：${this.lastLevel} → ${data.performance_level} (${data.performance_score}分)`);
+    
+    if (shouldTriggerByLevel || shouldTriggerByTime) {
+      if (shouldTriggerByLevel) {
+        console.log(`💭 等级变化：${this.lastLevel} → ${data.performance_level} (${data.performance_score}分)`);
+      } else {
+        console.log(`💭 固定时间触发（${(timeSinceLastTrigger/1000).toFixed(0)}秒）`);
+      }
       
       this.lastLevel = data.performance_level;
       this.lastScore = data.performance_score;
