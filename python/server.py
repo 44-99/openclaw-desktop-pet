@@ -156,18 +156,7 @@ class WebSocketServer:
                             "state": state
                         }))
                         
-                        # 如果性能等级变化，发送内心戏触发通知
-                        if system_data.get('level_changed'):
-                            logger.info(f"[PERF] Level changed: {system_data['performance_level']} ({system_data['performance_score']:.1f})")
-                            await websocket.send(json.dumps({
-                                "type": "performance_level_change",
-                                "score": system_data['performance_score'],
-                                "level": system_data['performance_level'],
-                                "cpu": system_data['cpu'],
-                                "memory": system_data['memory'],
-                                "gpu": system_data['gpu'],
-                                "gpu_temp": system_data['gpu_temp']
-                            }))
+                        # 静默模式：不发送额外的内心戏触发通知
                         
                         last_status_time = current_time
                     continue

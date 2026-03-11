@@ -39,12 +39,13 @@ class InnerVoiceManager {
     // 防抖：是否正在显示
     this.isShowing = false;
     
-    // ========== 新增状态管理 ==========
-    this.lastCheckTime = Date.now();  // 上次检查时间（初始化为现在，避免启动就触发）
+    // ========== 状态管理 ==========
+    this.lastCheckTime = Date.now();  // 上次检查时间
     this.lastTriggerTime = 0;         // 上次触发时间
     this.isWaitingResponse = false;   // 是否等待 LLM 回复
-    this.checkInterval = 20000;       // 检查间隔（20 秒）
-    this.lastLevel = null;            // 上次等级（null 表示还未设置）
+    this.checkInterval = 60000;       // 检查间隔（60 秒，减少日志）
+    this.triggerInterval = 3600000;   // 触发间隔（1 小时，减少 API 调用）
+    this.lastLevel = null;            // 上次等级
     this.lastScore = 100;             // 上次评分
   }
   
@@ -75,20 +76,12 @@ class InnerVoiceManager {
       return;
     }
     
-    // 检查等级是否变化，或者固定时间间隔触发（60 秒）
+    // 检查等级是否变化，或者固定时间间隔触发（1 小时）
     const timeSinceLastTrigger = now - this.lastTriggerTime;
     const shouldTriggerByLevel = this.lastLevel !== null && data.performance_level !== this.lastLevel;
-    const shouldTriggerByTime = timeSinceLastTrigger > 60000; // 60 秒强制触发一次
-    
-    console.log(`💭 当前等级：${data.performance_level}, 上次等级：${this.lastLevel || '未设置'}`);
+    const shouldTriggerByTime = timeSinceLastTrigger > this.triggerInterval; // 1 小时强制触发一次
     
     if (shouldTriggerByLevel || shouldTriggerByTime) {
-      if (shouldTriggerByLevel) {
-        console.log(`💭 等级变化：${this.lastLevel} → ${data.performance_level} (${data.performance_score}分)`);
-      } else {
-        console.log(`💭 固定时间触发（${(timeSinceLastTrigger/1000).toFixed(0)}秒）`);
-      }
-      
       this.lastLevel = data.performance_level;
       this.lastScore = data.performance_score;
       this.isWaitingResponse = true;
@@ -96,17 +89,15 @@ class InnerVoiceManager {
       this.generateInnerVoice(data);
     } else {
       if (this.lastLevel === null) {
-        console.log(`💭 首次设置等级：${data.performance_level}`);
         this.lastLevel = data.performance_level;
         this.lastScore = data.performance_score;
-      } else {
-        console.log(`💭 等级未变（${data.performance_level}），不触发`);
       }
+      // 静默模式，不打印日志
     }
   }
   
   /**
-   * 生成内心戏
+   * 生成内心戏（静默模式，减少日志）
    * @param {object} data - 性能数据
    */
   async generateInnerVoice(data) {
@@ -117,11 +108,8 @@ class InnerVoiceManager {
     const gpu = data.gpu || 0;
     const gpu_temp = data.gpu_temp || 0;
     
-    console.log(`💭 生成内心戏：${level} (${score.toFixed(1)}分)`);
-    
     // 随机选择语气
     const tone = TONES[Math.floor(Math.random() * TONES.length)];
-    console.log(`  → 语气：${tone}`);
     
     // 构建 Prompt
     const prompt = this.buildPrompt(tone, level, score, cpu, memory, gpu, gpu_temp);
@@ -142,12 +130,11 @@ class InnerVoiceManager {
         console.error('❌ 内心戏生成失败:', result.error);
       }
     } catch (error) {
-      console.error('❌ 内心戏生成错误:', error);
+      // 静默失败，不打印错误
     } finally {
       // 重置状态
       this.isWaitingResponse = false;
       this.lastTriggerTime = Date.now();
-      console.log('💭 内心戏生成完成');
     }
   }
   

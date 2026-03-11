@@ -664,12 +664,9 @@ function connectWebSocket() {
             colorRenderer.updateColor(data.performance_level);
           }
           
-          // 内心戏检查（每 20 秒）
+          // 内心戏检查（静默模式）
           if (innerVoiceManager) {
-            console.log('📡 性能数据更新，传递给内心戏管理器');
             innerVoiceManager.onPerformanceUpdate(systemStatus);
-          } else {
-            console.warn('⚠️ innerVoiceManager 未初始化');
           }
         }
       };
