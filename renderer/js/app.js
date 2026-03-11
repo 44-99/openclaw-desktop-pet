@@ -612,70 +612,84 @@ function connectWebSocket() {
   }
   
   try {
-    // 尝试连接默认端口 8765，失败则使用 8767
-    websocket = new WebSocket('ws://localhost:8765');
-    websocket.on('error', () => {
-      // 8765 失败，尝试 8767
-      websocket = new WebSocket('ws://localhost:8767');
-    });
-    websocketConnectCount = 0;
+    // 尝试多个端口（8765-8770）
+    const ports = [8765, 8767, 8768, 8769, 8770];
+    let currentPortIndex = 0;
     
-    websocket.onopen = () => {
-      console.log('WebSocket 连接成功');
-      updateStatus('已连接', 'idle');
-    };
-    
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'topic_response') {
-        showBubble(data.message, true);
-        isWaitingResponse = false;
-      } else if (data.type === 'auto_chat') {
-        showBubble(data.message, true);
-        if (window.electronAPI) {
-          window.electronAPI.playSound('notification');
-        }
-      } else if (data.type === 'system_status') {
-        handleSystemStatus(data);
-        
-        // 保存系统状态，用于对话时引用
-        systemStatus = {
-          cpu: data.cpu || 0,
-          memory: data.memory || 0,
-          gpu: data.gpu || 0,
-          gpu_temp: data.gpu_temp || 0,
-          network: data.network || { upload: 0, download: 0 },
-          performance_score: data.performance_score || 100,
-          performance_level: data.performance_level || '空闲',
-          level_changed: data.level_changed || false
-        };
-        
-        // 颜色实时更新（每秒）
-        if (data.level_changed && colorRenderer) {
-          colorRenderer.updateColor(data.performance_level);
-        }
-        
-        // 内心戏检查（每 20 秒）
-        if (innerVoiceManager) {
-          console.log('📡 性能数据更新，传递给内心戏管理器');
-          innerVoiceManager.onPerformanceUpdate(systemStatus);
-        } else {
-          console.warn('⚠️ innerVoiceManager 未初始化');
-        }
+    function tryConnect() {
+      if (currentPortIndex >= ports.length) {
+        console.log('所有端口尝试失败，使用模拟模式');
+        simulateSystemStatus();
+        return;
       }
-    };
+      
+      const port = ports[currentPortIndex];
+      console.log(`尝试连接 ws://localhost:${port} (${currentPortIndex + 1}/${ports.length})`);
+      
+      websocket = new WebSocket(`ws://localhost:${port}`);
+      
+      websocket.onopen = () => {
+        console.log(`WebSocket 连接成功 (端口 ${port})`);
+        updateStatus('已连接', 'idle');
+      };
+      
+      websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'topic_response') {
+          showBubble(data.message, true);
+          isWaitingResponse = false;
+        } else if (data.type === 'auto_chat') {
+          showBubble(data.message, true);
+          if (window.electronAPI) {
+            window.electronAPI.playSound('notification');
+          }
+        } else if (data.type === 'system_status') {
+          handleSystemStatus(data);
+          
+          // 保存系统状态，用于对话时引用
+          systemStatus = {
+            cpu: data.cpu || 0,
+            memory: data.memory || 0,
+            gpu: data.gpu || 0,
+            gpu_temp: data.gpu_temp || 0,
+            network: data.network || { upload: 0, download: 0 },
+            performance_score: data.performance_score || 100,
+            performance_level: data.performance_level || '空闲',
+            level_changed: data.level_changed || false
+          };
+          
+          // 颜色实时更新（每秒）
+          if (data.level_changed && colorRenderer) {
+            colorRenderer.updateColor(data.performance_level);
+          }
+          
+          // 内心戏检查（每 20 秒）
+          if (innerVoiceManager) {
+            console.log('📡 性能数据更新，传递给内心戏管理器');
+            innerVoiceManager.onPerformanceUpdate(systemStatus);
+          } else {
+            console.warn('⚠️ innerVoiceManager 未初始化');
+          }
+        }
+      };
+      
+      websocket.onclose = () => {
+        console.log('WebSocket 连接关闭');
+        updateStatus('未连接', 'critical');
+        // 端口断开，尝试下一个
+        currentPortIndex++;
+        websocketReconnectTimer = setTimeout(tryConnect, 1000);
+      };
+      
+      websocket.onerror = (error) => {
+        console.error(`WebSocket 错误 (端口 ${port}):`, error);
+        updateStatus('连接错误', 'critical');
+      };
+    }
     
-    websocket.onclose = () => {
-      console.log('WebSocket 连接关闭');
-      updateStatus('未连接', 'critical');
-      websocketReconnectTimer = setTimeout(connectWebSocket, 5000);
-    };
-    
-    websocket.onerror = (error) => {
-      console.error('WebSocket 错误:', error);
-      updateStatus('连接错误', 'critical');
-    };
+    tryConnect();
+    websocketConnectCount = 0;
   } catch (error) {
     console.error('WebSocket 连接失败:', error);
     websocketConnectCount++;
