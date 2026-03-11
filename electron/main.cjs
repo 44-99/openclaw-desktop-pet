@@ -152,12 +152,12 @@ function createWindow() {
   });
   
   // 开发模式打开开发者工具
-  // mainWindow.webContents.openDevTools();
+  mainWindow.webContents.openDevTools();
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   
   // 打开开发者工具（开发时）
-  // mainWindow.webContents.openDevTools();
+  mainWindow.webContents.openDevTools();
 
   // 窗口关闭时
   mainWindow.on('closed', () => {
