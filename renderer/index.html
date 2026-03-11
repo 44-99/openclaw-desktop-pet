@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:8765">
+  <title>哈基虾桌面宠物</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 3D 容器 -->
+  <div id="canvas-container"></div>
+  
+  <!-- 对话气泡 -->
+  <div id="speech-bubble" class="hidden">
+    <div id="bubble-text"></div>
+    <div id="bubble-arrow"></div>
+  </div>
+  
+  <!-- 状态指示器 -->
+  <div id="status-indicator">
+    <div id="status-dot"></div>
+    <span id="status-text">空闲</span>
+  </div>
+  
+  <!-- 右键菜单 -->
+  <div id="context-menu" class="hidden">
+    <div class="menu-item" data-action="talk">💬 和我说话</div>
+    <div class="menu-item" data-action="rotate">🔄 360° 查看我</div>
+    <div class="menu-item" data-action="status">📊 系统状态</div>
+    <div class="menu-divider"></div>
+    
+    <!-- 情绪测试子菜单 -->
+    <div class="menu-item" style="font-weight: bold; color: #666;">🎭 情绪测试</div>
+    <div class="menu-item" data-action="emotion-happy" style="padding-left: 32px;">😊 开心</div>
+    <div class="menu-item" data-action="emotion-idle" style="padding-left: 32px;">😌 悠闲</div>
+    <div class="menu-item" data-action="emotion-sleepy" style="padding-left: 32px;">😴 困倦</div>
+    <div class="menu-divider"></div>
+    
+    <div class="menu-item" data-action="openclaw">🦞 打开 OpenClaw</div>
+    <div class="menu-item" data-action="hide">👻 隐藏 (F12)</div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" data-action="quit">❌ 退出</div>
+    <div class="menu-divider"></div>
+    <div style="padding: 8px 16px; font-size: 11px; color: #999;">
+      🖱️ 长按左键拖动旋转<br>
+      🖱️ 右键/中键拖动移动窗口
+    </div>
+  </div>
+  
+  <!-- 加载指示器 -->
+  <div id="loading">
+    <div class="loader"></div>
+    <div>哈基虾准备中...</div>
+  </div>
+
+  <!-- 引入 Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.1.0/lib/three-vrm.module.min.js",
+      "./js/emotion-system.js": "./js/emotion-system.js"
+    }
+  }
+  </script>
+  
+  <!-- 主逻辑 -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

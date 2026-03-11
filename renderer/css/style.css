@@ -1,0 +1,225 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3); /* 半透明黑色背景，方便看到窗口 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  user-select: none;
+  /* 移除 -webkit-app-region: drag，让整个窗口都可以交互 */
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+#canvas-container {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: pointer;
+  transition: cursor 0.2s;
+}
+
+#canvas-container:active {
+  cursor: grabbing;
+}
+
+/* 对话气泡 */
+#speech-bubble {
+  position: absolute;
+  top: 20px;
+  right: 60px;
+  background: white;
+  border-radius: 20px;
+  padding: 12px 16px;
+  max-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: bubble-appear 0.3s ease-out;
+  z-index: 1000;
+  pointer-events: none; /* 让气泡不阻挡点击 */
+}
+
+#speech-bubble.hidden {
+  display: none;
+}
+
+#bubble-text {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.4;
+}
+
+#bubble-arrow {
+  position: absolute;
+  bottom: -8px;
+  right: 20px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid white;
+}
+
+@keyframes bubble-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 状态指示器 */
+#status-indicator {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #666;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  pointer-events: none; /* 让状态指示器不阻挡点击 */
+}
+
+#status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4CAF50;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 右键菜单 */
+#context-menu {
+  position: absolute;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 8px 0;
+  min-width: 160px;
+  z-index: 2000;
+}
+
+#context-menu.hidden {
+  display: none;
+}
+
+.menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background: #f0f0f0;
+}
+
+.menu-divider {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 8px 0;
+}
+
+/* 加载指示器 */
+#loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  z-index: 3000;
+}
+
+.loader {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 状态颜色 */
+.status-idle { background: #4CAF50; }
+.status-normal { background: #2196F3; }
+.status-busy { background: #FF9800; }
+.status-high { background: #F44336; }
+.status-critical { background: #9C27B0; }
+
+/* ========== 内心戏气泡（头顶位置） ========== */
+.inner-voice-bubble {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px dashed #FF99CC;
+  border-radius: 15px;
+  padding: 8px 12px;
+  max-width: 180px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transition: all 0.5s ease-out;
+  pointer-events: none;
+  z-index: 1500;
+}
+
+.inner-voice-bubble.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.inner-voice-bubble.fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-30px);
+}
+
+.inner-voice-text {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.3;
+  font-style: italic;
+  text-align: center;
+}
+
+.inner-voice-arrow {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(255, 255, 255, 0.9);
+}

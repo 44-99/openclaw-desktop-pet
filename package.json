@@ -1,0 +1,59 @@
+{
+  "name": "openclaw-desktop-pet",
+  "version": "1.0.0",
+  "description": "3D desktop pet for OpenClaw (Electron + Three.js)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:portable": "electron-builder --win portable",
+    "python": "cd python && python server.py"
+  },
+  "keywords": [
+    "desktop-pet",
+    "electron",
+    "threejs",
+    "openclaw",
+    "hajixia",
+    "openclaw-extension"
+  ],
+  "author": "44-99",
+  "license": "MIT",
+  "openclaw": {
+    "id": "openclaw-desktop-pet",
+    "extensions": ["./index.ts"]
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@pixiv/three-vrm": "^3.0.0",
+    "three": "^0.180.0",
+    "ws": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.openclaw.desktoppet",
+    "productName": "哈基虾桌面宠物",
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "${productName}-portable.exe"
+    }
+  }
+}

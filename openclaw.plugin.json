@@ -1,0 +1,41 @@
+{
+  "id": "openclaw-desktop-pet",
+  "name": "哈基虾桌面宠物",
+  "description": "3D 桌面宠物，深度集成 OpenClaw，实时显示 AI 状态",
+  "version": "1.0.0",
+  "author": "44-99",
+  "license": "MIT",
+  "homepage": "https://github.com/44-99/openclaw-desktop-pet",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "是否启用桌面宠物"
+      },
+      "alwaysOnTop": {
+        "type": "boolean",
+        "default": true,
+        "description": "窗口是否始终置顶"
+      },
+      "transparent": {
+        "type": "boolean",
+        "default": true,
+        "description": "是否透明背景"
+      },
+      "theme": {
+        "type": "string",
+        "default": "default",
+        "description": "主题/MOD 名称"
+      },
+      "performanceMode": {
+        "type": "string",
+        "enum": ["normal", "low"],
+        "default": "normal",
+        "description": "性能模式（低配模式减少粒子特效）"
+      }
+    }
+  }
+}
