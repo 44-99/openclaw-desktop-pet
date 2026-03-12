@@ -27,6 +27,9 @@ let pythonProcess;
 let tray = null;
 let gatewayToken = null;
 
+// 进程锁文件路径（防止重复启动）
+const LOCK_FILE = path.join(os.tmpdir(), 'hajixia-python.lock');
+
 // OpenClaw Gateway 配置
 const OPENCLAW_GATEWAY_URL = 'http://127.0.0.1:18789';
 
@@ -167,10 +170,38 @@ function createWindow() {
 
 // 启动 Python 后端
 function startPythonServer() {
+  // 检查锁文件（防止重复启动）
+  if (fs.existsSync(LOCK_FILE)) {
+    try {
+      const lockData = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf-8'));
+      const pid = lockData.pid;
+      
+      // 检查进程是否还在运行
+      try {
+        process.kill(pid, 0); // 检查进程是否存在
+        console.log(`✅ Python 进程已在运行 (PID: ${pid})，跳过启动`);
+        return;
+      } catch (e) {
+        // 进程不存在，删除锁文件
+        console.log('🗑️ 检测到残留锁文件，清理中...');
+        fs.unlinkSync(LOCK_FILE);
+      }
+    } catch (e) {
+      console.log('⚠️ 锁文件解析失败，清理中...');
+      try { fs.unlinkSync(LOCK_FILE); } catch (e2) {}
+    }
+  }
+  
+  // 检查是否已有进程
+  if (pythonProcess) {
+    console.log('⚠️ Python 进程已存在，跳过启动');
+    return;
+  }
+  
   const serverPath = path.join(__dirname, 'python', 'server.py');
   const pythonCommand = getPythonCommand();
 
-  console.log('Starting Python backend with:', pythonCommand);
+  console.log('🐍 Starting Python backend with:', pythonCommand);
 
   // 使用 pipe 捕获 Python 输出
   pythonProcess = spawn(pythonCommand, [serverPath], {
@@ -178,6 +209,14 @@ function startPythonServer() {
     detached: false,  // 子进程，父进程退出时自动退出
     stdio: ['ignore', 'pipe', 'pipe']  // 捕获 stdout/stderr
   });
+  
+  // 创建锁文件
+  fs.writeFileSync(LOCK_FILE, JSON.stringify({
+    pid: pythonProcess.pid,
+    startTime: Date.now()
+  }));
+  
+  console.log(`✅ Python backend started (PID: ${pythonProcess.pid})`);
 
   let pythonClosed = false;
 
@@ -199,9 +238,19 @@ function startPythonServer() {
 
   pythonProcess.on('close', (code) => {
     pythonClosed = true;
-    if (code !== 0 && code !== null) {
-      console.log(`Python process exited with code ${code}`);
+    console.log(`Python process exited with code ${code}`);
+    
+    // 清理锁文件
+    try {
+      if (fs.existsSync(LOCK_FILE)) {
+        fs.unlinkSync(LOCK_FILE);
+        console.log('🗑️ 锁文件已清理');
+      }
+    } catch (e) {
+      console.error('清理锁文件失败:', e.message);
     }
+    
+    pythonProcess = null;
   });
 
   pythonProcess.on('error', (err) => {
@@ -342,6 +391,8 @@ function createTray() {
 
 // 应用就绪时
 app.whenReady().then(async () => {
+  console.log('🚀 App ready, creating window...');
+  
   // 先加载网关 Token
   loadGatewayToken();
   
@@ -351,6 +402,7 @@ app.whenReady().then(async () => {
   
   // WebSocket 连接由前端 renderer 自行管理，主进程不需要连接
   console.log('ℹ️ Python WebSocket 将由前端 renderer 连接');
+  console.log('✅ App initialization complete');
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -370,8 +422,9 @@ app.on('window-all-closed', (event) => {
 
 // 应用退出前（后备清理方案，确保 Python 进程被杀死）
 app.on('before-quit', (event) => {
+  console.log('🦞 应用退出，清理资源...');
+  
   if (pythonProcess) {
-    console.log('🦞 before-quit 触发，强制关闭 Python 后端...');
     try {
       if (process.platform === 'win32') {
         const { execSync } = require('child_process');
@@ -383,6 +436,16 @@ app.on('before-quit', (event) => {
     } catch (err) {
       console.error('⚠️ 强制关闭 Python 失败：' + err.message);
     }
+  }
+  
+  // 清理锁文件
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      fs.unlinkSync(LOCK_FILE);
+      console.log('🗑️ 锁文件已清理');
+    }
+  } catch (e) {
+    console.error('清理锁文件失败:', e.message);
   }
 });
 
@@ -521,10 +584,15 @@ ipcMain.on('show-from-tray', () => {
   }
 });
 
-// 窗口拖拽 - 手动实现
+// 窗口拖拽 - 手动实现（通过 delta 移动）
 ipcMain.on('move-window', (event, deltaX, deltaY) => {
   const bounds = mainWindow.getBounds();
   mainWindow.setPosition(bounds.x + deltaX, bounds.y + deltaY);
+});
+
+// 窗口拖拽 - 直接设置位置（用于鼠标拖动）
+ipcMain.on('set-window-position', (event, x, y) => {
+  mainWindow.setPosition(Math.round(x), Math.round(y));
 });
 
 // ========== OpenClaw 集成 ==========
@@ -697,7 +765,7 @@ ipcMain.handle('delete-pending-topic', async (event, sessionKey) => {
   }
 });
 
-// 打开桌面宠物会话
+// 打开桌面宠物会话（使用系统默认浏览器）
 ipcMain.handle('open-desktop-pet-session', async (event, sessionKey) => {
   try {
     // 传入的 sessionKey 格式：desktop-pet:xxx
@@ -709,10 +777,11 @@ ipcMain.handle('open-desktop-pet-session', async (event, sessionKey) => {
       console.log(`🔑 会话 Key 转换：${sessionKey} → ${actualKey}`);
     }
     
+    // 使用系统默认浏览器打开（不是 Electron 窗口）
     const url = `http://127.0.0.1:18789/?session=${encodeURIComponent(actualKey)}`;
     
-    shell.openExternal(url);
-    console.log('🚀 打开桌面宠物会话:', url);
+    await shell.openExternal(url);
+    console.log('🚀 已使用系统默认浏览器打开桌面宠物会话:', url);
     
     return { success: true };
   } catch (error) {

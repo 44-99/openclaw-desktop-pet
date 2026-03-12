@@ -43,7 +43,7 @@ class InnerVoiceManager {
     this.lastCheckTime = Date.now();  // 上次检查时间
     this.lastTriggerTime = 0;         // 上次触发时间
     this.isWaitingResponse = false;   // 是否等待 LLM 回复
-    this.checkInterval = 60000;       // 检查间隔（60 秒，减少日志）
+    this.checkInterval = 3600000;       // 检查间隔（3600 秒，减少日志）
     this.triggerInterval = 3600000;   // 触发间隔（1 小时，减少 API 调用）
     this.lastLevel = null;            // 上次等级
     this.lastScore = 100;             // 上次评分

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:* ws://127.0.0.1:*">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:* ws://127.0.0.1:*">
   <title>哈基虾桌面宠物</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -25,27 +25,21 @@
   
   <!-- 右键菜单 -->
   <div id="context-menu" class="hidden">
-    <div class="menu-item" data-action="talk">💬 和我说话</div>
+    <!-- 功能类 -->
+    <div class="menu-item" data-action="openclaw">🦞 打开 OpenClaw</div>
     <div class="menu-item" data-action="rotate">🔄 360° 查看我</div>
     <div class="menu-item" data-action="status">📊 系统状态</div>
     <div class="menu-divider"></div>
     
-    <!-- 情绪测试子菜单 -->
-    <div class="menu-item" style="font-weight: bold; color: #666;">🎭 情绪测试</div>
-    <div class="menu-item" data-action="emotion-happy" style="padding-left: 32px;">😊 开心</div>
-    <div class="menu-item" data-action="emotion-idle" style="padding-left: 32px;">😌 悠闲</div>
-    <div class="menu-item" data-action="emotion-sleepy" style="padding-left: 32px;">😴 困倦</div>
+    <!-- 情绪效果接口（保留，后续实现） -->
+    <div class="menu-item" data-action="effect-happy" style="display:none">😊 开心效果</div>
+    <div class="menu-item" data-action="effect-excited" style="display:none">🎉 兴奋效果</div>
+    <div class="menu-item" data-action="effect-calm" style="display:none">😌 平静效果</div>
     <div class="menu-divider"></div>
     
-    <div class="menu-item" data-action="openclaw">🦞 打开 OpenClaw</div>
-    <div class="menu-item" data-action="hide">👻 隐藏 (F12)</div>
-    <div class="menu-divider"></div>
-    <div class="menu-item" data-action="quit">❌ 退出</div>
-    <div class="menu-divider"></div>
-    <div style="padding: 8px 16px; font-size: 11px; color: #999;">
-      🖱️ 长按左键拖动旋转<br>
-      🖱️ 右键/中键拖动移动窗口
-    </div>
+    <!-- 窗口控制类 -->
+    <div class="menu-item" data-action="hide">👻 隐藏</div>
+    <div class="menu-item" data-action="quit">❌ 退出哈基虾</div>
   </div>
   
   <!-- 加载指示器 -->
@@ -54,13 +48,12 @@
     <div>哈基虾准备中...</div>
   </div>
 
-  <!-- 引入 Three.js (使用国内 CDN 镜像) -->
+  <!-- 引入 Three.js (本地版本) -->
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/",
-      "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3.1.0/lib/three-vrm.module.min.js",
+      "three": "../node_modules/three/build/three.module.js",
+      "three/addons/": "../node_modules/three/examples/jsm/",
       "./js/emotion-system.js": "./js/emotion-system.js"
     }
   }

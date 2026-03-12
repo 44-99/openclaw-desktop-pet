@@ -76,22 +76,61 @@ class WebSocketServer:
             return s.connect_ex(('localhost', port)) == 0
     
     def kill_process_on_port(self, port):
+        """强制杀死占用端口的进程，并验证端口是否释放"""
         system = platform.system()
+        killed_pids = []
+        
         try:
             if system == "Windows":
-                result = subprocess.run(f'netstat -ano | findstr :{port}', shell=True, capture_output=True, text=True)
+                # Step 1: 查找占用端口的进程
+                result = subprocess.run(
+                    f'netstat -ano | findstr :{port}',
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace'
+                )
+                
                 if result.stdout:
+                    logger.info(f"[Port {port}] Found processes:")
                     for line in result.stdout.strip().split('\n'):
-                        if line:
+                        if line and 'LISTENING' in line:
                             parts = line.split()
                             if len(parts) >= 5:
                                 pid = parts[-1]
-                                if pid.isdigit():
-                                    subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True)
-                                    return True
-        except:
-            pass
-        return False
+                                if pid.isdigit() and pid not in killed_pids:
+                                    # Step 2: 强制杀死进程
+                                    logger.info(f"[Port {port}] Killing PID {pid}...")
+                                    kill_result = subprocess.run(
+                                        f'taskkill /F /PID {pid}',
+                                        shell=True,
+                                        capture_output=True,
+                                        text=True
+                                    )
+                                    
+                                    if kill_result.returncode == 0:
+                                        logger.info(f"[Port {port}] ✅ Killed PID {pid}")
+                                        killed_pids.append(pid)
+                                    else:
+                                        logger.warning(f"[Port {port}] ❌ Failed to kill PID {pid}: {kill_result.stderr}")
+                
+                # Step 3: 等待端口释放
+                if killed_pids:
+                    logger.info(f"[Port {port}] Waiting for port to release...")
+                    for _ in range(10):  # 最多等 5 秒
+                        time.sleep(0.5)
+                        if not self.is_port_in_use(port):
+                            logger.info(f"[Port {port}] ✅ Port released!")
+                            return True
+                    
+                    logger.warning(f"[Port {port}] ⚠️ Port still in use after killing processes")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"[Port {port}] Error killing process: {e}")
+        
+        return len(killed_pids) > 0
     
     def find_available_port(self, start_port=8765, max_attempts=10):
         for port in range(start_port, start_port + max_attempts):
@@ -178,18 +217,35 @@ class WebSocketServer:
     async def start(self):
         logger.info("[Hajixia] Starting...")
         
-        # Step 1: Try to kill existing process on default port
-        if self.is_port_in_use(self.port):
-            logger.warning(f"[WARN] Port {self.port} in use!")
-            if self.kill_process_on_port(self.port):
-                logger.info("[OK] Process killed, waiting for port to release...")
-                await asyncio.sleep(2)
+        # Step 1: Try to kill existing process on default port (max 3 attempts)
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            if self.is_port_in_use(self.port):
+                logger.warning(f"[Attempt {attempt+1}/{max_attempts}] Port {self.port} in use!")
+                
+                if self.kill_process_on_port(self.port):
+                    logger.info("[OK] Process killed, waiting for port to release...")
+                    await asyncio.sleep(2)
+                    
+                    # Verify port is actually free
+                    if not self.is_port_in_use(self.port):
+                        logger.info(f"[OK] Port {self.port} is now free!")
+                        break
+                    else:
+                        logger.warning(f"[WARN] Port {self.port} still in use after killing")
+                else:
+                    logger.warning(f"[WARN] No process killed on port {self.port}")
+            else:
+                logger.info(f"[OK] Port {self.port} is available")
+                break
         
-        # Step 2: If port still in use, find available port
+        # Step 2: If port still in use, find alternative port
         if self.is_port_in_use(self.port):
+            logger.warning(f"[WARN] Port {self.port} still busy after {max_attempts} attempts, finding alternative...")
             new_port = self.find_available_port(self.port + 1, max_attempts=20)
+            
             if new_port:
-                logger.info(f"[OK] Port {self.port} busy, using port: {new_port}")
+                logger.info(f"[OK] Using alternative port: {new_port}")
                 self.port = new_port
             else:
                 logger.error(f"[ERROR] No available port found in range {self.port}-{self.port + 20}")

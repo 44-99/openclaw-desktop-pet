@@ -22,7 +22,7 @@ const EXPRESSION_CONFIG = {
     eyeY: 0.35,              // 眼睛位置上移
     mouthRotate: 0,          // 嘴巴微笑（向上）
     mouthScale: 1.5,         // 嘴巴放大
-    color: 0xFF6666,         // 明亮的龙虾红
+    // color: 0xFF6666,      // ❌ 删除 - 颜色由系统状态统一控制
     floatAmp: 0.15,          // 漂浮幅度增大
     floatSpeed: 1.3,         // 漂浮速度加快
     antennaSpeed: 0.08,      // 触角摆动加快
@@ -33,7 +33,7 @@ const EXPRESSION_CONFIG = {
     eyeY: 0.3,               // 眼睛位置正常
     mouthRotate: Math.PI,    // 嘴巴自然状态（向下）
     mouthScale: 1.0,         // 嘴巴正常
-    color: 0xFF4444,         // 龙虾红
+    // color: 0xFF4444,      // ❌ 删除 - 颜色由系统状态统一控制
     floatAmp: 0.1,           // 漂浮幅度正常
     floatSpeed: 1.0,         // 漂浮速度正常
     antennaSpeed: 0.03,      // 触角摆动缓慢
@@ -44,7 +44,7 @@ const EXPRESSION_CONFIG = {
     eyeY: 0.2,               // 眼睛位置下降
     mouthRotate: Math.PI * 0.8,  // 嘴巴微张
     mouthScale: 0.9,         // 嘴巴缩小
-    color: 0x9966FF,         // 紫色（困倦色）
+    // color: 0x9966FF,      // ❌ 删除 - 颜色由系统状态统一控制
     floatAmp: 0.05,          // 漂浮幅度减小
     floatSpeed: 0.5,         // 漂浮速度减慢
     antennaSpeed: 0.01,      // 触角几乎不动

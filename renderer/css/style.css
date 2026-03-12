@@ -41,10 +41,13 @@ body {
   animation: bubble-appear 0.3s ease-out;
   z-index: 1000;
   pointer-events: none; /* 让气泡不阻挡点击 */
+  opacity: 1; /* 确保可见 */
 }
 
 #speech-bubble.hidden {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
 }
 
 #bubble-text {

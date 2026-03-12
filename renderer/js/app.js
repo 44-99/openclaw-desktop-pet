@@ -1,1004 +1,575 @@
+// ==================== 导入 Three.js ====================
 import * as THREE from 'three';
-import { EMOTION_TYPES, EXPRESSION_CONFIG, EmotionState, EmotionTrigger } from './emotion-system.js';
-import { ColorRenderer, PERFORMANCE_COLORS, LEVEL_NAMES } from './color-renderer.js';
-import { InnerVoiceManager, TONES } from './inner-voice.js';
-import { TopicGenerator, TOPIC_TYPES, KNOWLEDGE_CATEGORIES } from './topic-generator.js';
+
+// ==================== 导入现有模块 ====================
+import { TopicGenerator } from './topic-generator.js';
+import { ColorRenderer } from './color-renderer.js';
+import { EmotionState, EmotionTrigger, EXPRESSION_CONFIG } from './emotion-system.js';
 import { ParticleSystemManager } from './particle-system.js';
+import { InnerVoiceManager } from './inner-voice.js';
 
 // ==================== 全局变量 ====================
-let scene, camera, renderer, pet, waterSurface, waterContainer;
-let websocket;
-let currentState = 'idle';
-let isHidden = false;
-let isWaitingResponse = false;
-
-// 情绪系统
-let emotionSystem;
-let emotionTrigger;
-
-// 颜色渲染器
-let colorRenderer;
-
-// 内心戏管理器
-let innerVoiceManager;
-
-// 话题生成器
-let topicGenerator;
-
-// 粒子系统管理器
-let particleManager;
-
-// 系统状态（从 Python 后端同步）
-let systemStatus = {
-  cpu: 0,
-  memory: 0,
-  gpu: 0,
-  gpu_temp: 0,
-  network: { upload: 0, download: 0 },
-  performance_score: 100,
-  performance_level: '空闲',
-  level_changed: false
-};
-
-// 视角旋转控制
-let isRotating = false;
-let rotationStartX = 0;
-let rotationStartY = 0;
-let petRotationX = 0;
-let petRotationY = 0;
-let longPressTimer = null;
-let wasLongPress = false;
-const LONG_PRESS_DELAY = 200;
-
-// 水箱系统
-const WATER_LEVELS = {
-  idle: 2.5,        // 最佳状态 - 水最满
-  normal: 2.0,      // 正常 - 水稍低
-  busy: 1.5,        // 忙碌 - 水一半
-  high: 1.0,        // 高负载 - 水很少
-  critical: 0.3     // 崩溃 - 几乎没水
-};
-
-// 状态颜色（红→黄→蓝→绿渐变）
-const STATE_COLORS = {
-  idle: 0x00FF00,      // 绿色 - 最佳状态
-  normal: 0x88FF00,    // 黄绿色 - 正常
-  busy: 0x0088FF,      // 蓝色 - 中等
-  high: 0xFF8800,      // 橙色 - 高负载
-  critical: 0xFF0000   // 红色 - 崩溃
-};
-
-const WATER_COLORS = {
-  idle: 0x00FF88,      // 翠绿色
-  normal: 0x88FF44,    // 浅绿色
-  busy: 0x0088FF,      // 蓝色
-  high: 0xFF6600,      // 橙色
-  critical: 0xFF0044   // 红色
-};
-
-// 状态颜色（龙虾经典红 + 状态色）
-const COLORS = {
-  idle: 0xFF4444,      // 龙虾红 - 空闲
-  normal: 0xFF6666,    // 浅红 - 正常
-  busy: 0xFFAA00,      // 橙色 - 忙碌
-  high: 0xFF4444,      // 红色 - 高负载
-  critical: 0x880000   // 暗红 - 崩溃
-};
-
-// 表情配置
-const EXPRESSIONS = {
-  idle: { eyeScale: 1, mouthRotate: Math.PI, mouthScale: 1, eyeY: 0.3 },
-  happy: { eyeScale: 1.2, mouthRotate: 0, mouthScale: 1.5, eyeY: 0.35 },
-  surprised: { eyeScale: 1.5, mouthRotate: Math.PI * 1.5, mouthScale: 0.8, eyeY: 0.4 },
-  worried: { eyeScale: 0.8, mouthRotate: Math.PI * 0.8, mouthScale: 0.7, eyeY: 0.25 },
-  critical: { eyeScale: 0.6, mouthRotate: Math.PI * 0.5, mouthScale: 0.5, eyeY: 0.2 }
-};
-
-// 宠物组件引用（用于动画）
+let scene, camera, renderer, pet;
 let petParts = {};
 
-// ==================== 初始化 ====================
-function init() {
-  try {
-    console.log('🦞 哈基虾初始化开始...');
-    
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 5;
-    
-    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000, 0);
-    document.getElementById('canvas-container').appendChild(renderer.domElement);
-    
-    console.log('✅ Three.js 初始化完成');
-    
-    createPet();
-    
-    console.log('✅ 哈基虾模型创建完成');
-    
-    // 增强光照
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-    
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
-    
-    const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    backLight.position.set(-5, 3, -5);
-    scene.add(backLight);
-    
-    console.log('✅ 光照设置完成');
-    
-    // 初始化情绪系统
-    emotionSystem = new EmotionState();
-    emotionTrigger = new EmotionTrigger(emotionSystem);
-    
-    // 根据时间设置初始情绪
-    emotionSystem.autoAdjustByTime();
-    
-    console.log('✅ 情绪系统初始化完成，当前情绪:', emotionSystem.currentEmotion);
-    
-    // 初始化颜色渲染器
-    colorRenderer = new ColorRenderer(petParts);
-    console.log('✅ 颜色渲染器初始化完成');
-    
-    // 初始化内心戏管理器
-    innerVoiceManager = new InnerVoiceManager({
-      sendToOpenClaw: (message) => window.electronAPI.sendToOpenClaw(message),
-      showBubble: (text) => showBubble(text, false)
-    });
-    console.log('✅ 内心戏管理器初始化完成（检查间隔 20 秒）');
-    
-    // 初始化话题生成器
-    topicGenerator = new TopicGenerator({
-      sendToOpenClaw: (message, sessionKey) => window.electronAPI.sendToOpenClaw(message, sessionKey),
-      hasTavilyAPI: false  // TODO: 从 Electron 主进程读取
-    });
-    console.log('✅ 话题生成器初始化完成');
-    
-    // 初始化粒子系统管理器
-    particleManager = new ParticleSystemManager(scene);
-    console.log('✅ 粒子系统初始化完成');
-    
-    connectWebSocket();
-    setupEvents();
-    
-    console.log('✅ WebSocket 和事件设置完成');
-    
-    setTimeout(() => {
-      document.getElementById('loading').style.display = 'none';
-      console.log('✅ 加载指示器隐藏，哈基虾上线！');
-    }, 1000);
-    
-    animate();
-    
-    console.log('✅ 哈基虾初始化完成！');
-  } catch (error) {
-    console.error('❌ 初始化失败:', error);
-    document.getElementById('loading').innerHTML = `<div style="color: red; padding: 20px;">初始化失败：<br>${error.message}</div>`;
-  }
-}
+// 模块实例
+let colorRenderer = null;
+let emotionSystem = null;
+let particleManager = null;
+let innerVoiceManager = null;
+let topicGenerator = null;
 
-// ==================== 创建水箱 ====================
-function createWaterTank() {
-  // 1. 背景渐变色板（显示状态颜色）
-  const bgGeometry = new THREE.CylinderGeometry(3.6, 3.6, 5.2, 32, 1, true);
-  const bgMaterial = new THREE.MeshBasicMaterial({
-    color: STATE_COLORS.idle,
-    transparent: true,
-    opacity: 0.15,
-    side: THREE.DoubleSide
-  });
-  const bgCylinder = new THREE.Mesh(bgGeometry, bgMaterial);
-  bgCylinder.position.y = -0.4;
-  scene.add(bgCylinder);
-  petParts.stateBg = bgCylinder;
-  
-  // 2. 透明玻璃容器（圆柱形）
-  const tankGeometry = new THREE.CylinderGeometry(3.5, 3.5, 5, 32, 1, true);
-  const tankMaterial = new THREE.MeshPhongMaterial({
-    color: 0xFFFFFF,
-    transparent: true,
-    opacity: 0.2,
-    side: THREE.DoubleSide,
-    shininess: 100,
-    specular: 0x444444
-  });
-  const tank = new THREE.Mesh(tankGeometry, tankMaterial);
-  tank.position.y = -0.5;
-  scene.add(tank);
-  petParts.tank = tank;
-  
-  // 3. 水箱底部
-  const bottomGeometry = new THREE.CylinderGeometry(3.5, 3.5, 0.1, 32);
-  const bottomMaterial = new THREE.MeshPhongMaterial({
-    color: 0xFFFFFF,
-    transparent: true,
-    opacity: 0.4,
-    shininess: 80
-  });
-  const bottom = new THREE.Mesh(bottomGeometry, bottomMaterial);
-  bottom.position.y = -3;
-  scene.add(bottom);
-  petParts.tankBottom = bottom;
-  
-  // 3. 水面（会上下移动）
-  const waterGeometry = new THREE.CylinderGeometry(3.4, 3.4, 0.3, 32);
-  const waterMaterial = new THREE.MeshPhongMaterial({
-    color: WATER_COLORS.idle,
-    transparent: true,
-    opacity: 0.7,
-    shininess: 100,
-    specular: 0x666666
-  });
-  waterSurface = new THREE.Mesh(waterGeometry, waterMaterial);
-  waterSurface.position.y = WATER_LEVELS.idle;
-  scene.add(waterSurface);
-  petParts.waterSurface = waterSurface;
-  
-  // 4. 水体（半透明填充）
-  const waterBodyGeometry = new THREE.CylinderGeometry(3.4, 3.4, WATER_LEVELS.idle, 32);
-  const waterBodyMaterial = new THREE.MeshPhongMaterial({
-    color: WATER_COLORS.idle,
-    transparent: true,
-    opacity: 0.4,
-    shininess: 80
-  });
-  const waterBody = new THREE.Mesh(waterBodyGeometry, waterBodyMaterial);
-  waterBody.position.y = WATER_LEVELS.idle / 2 - 1.5;
-  scene.add(waterBody);
-  petParts.waterBody = waterBody;
-}
+// WebSocket
+let websocket = null;
 
-// ==================== 创建哈基虾（升级版） ====================
+// 鼠标控制
+let isRotating = false;
+let rotateStartX = 0, rotateStartY = 0;
+
+// ==================== 创建哈基虾（Q 版萌化版） ====================
 function createPet() {
   pet = new THREE.Group();
   
-  const mainColor = COLORS.idle;
-  const darkColor = 0xCC3333;
+  const mainColor = 0xFF4444;  // 初始龙虾红
+  const accentColor = 0xFF9999;
+  const white = 0xFFFFFF;
+  const darkPupil = 0x1a1a2e;
   
-  // 将虾放在水箱中央
   pet.position.y = 0;
   
-  // ========== 身体部分 ==========
-  
-  // 1. 头胸部（主要身体）- 更扁平的椭圆形
-  const cephalothoraxGeometry = new THREE.SphereGeometry(1, 32, 32);
-  cephalothoraxGeometry.scale(1.1, 0.9, 0.85);
+  // ========== 1. 头胸部（中心） ==========
+  const cephalothoraxGeometry = new THREE.SphereGeometry(1.1, 48, 48);
+  cephalothoraxGeometry.scale(1.0, 0.85, 0.95);
+  cephalothoraxGeometry.computeVertexNormals();
   const cephalothoraxMaterial = new THREE.MeshPhongMaterial({ 
-    color: mainColor, 
-    shininess: 80,
-    specular: 0x444444
+    color: mainColor, shininess: 90, specular: 0x444444 
   });
   const cephalothorax = new THREE.Mesh(cephalothoraxGeometry, cephalothoraxMaterial);
   pet.add(cephalothorax);
   petParts.cephalothorax = cephalothorax;
   
-  // 2. 腹部（分节）- 3 节逐渐变小，紧密连接
+  // ========== 2. 腹部（3 节，紧密连接） ==========
   for (let i = 0; i < 3; i++) {
-    const size = 0.65 - i * 0.1;
-    const segmentGeometry = new THREE.SphereGeometry(size, 24, 24);
-    segmentGeometry.scale(0.9, 0.85, 0.75);
+    const size = 0.7 - i * 0.08;
+    const segmentGeometry = new THREE.SphereGeometry(size, 32, 32);
+    segmentGeometry.scale(0.9, 0.8, 0.8);
+    segmentGeometry.computeVertexNormals();
     const segmentMaterial = new THREE.MeshPhongMaterial({ 
-      color: i % 2 === 0 ? mainColor : darkColor,
-      shininess: 70
+      color: mainColor, shininess: 85, specular: 0x444444 
     });
     const segment = new THREE.Mesh(segmentGeometry, segmentMaterial);
-    // 紧密连接：每节间隔=size*0.85（扁率）
-    segment.position.set(0, -0.85 - i * (size * 0.85), -0.3);
+    segment.position.set(0, -0.5 - i * 0.45, -0.12);
     pet.add(segment);
     petParts[`abdomen${i}`] = segment;
   }
   
-  // 3. 尾巴（扇形）
-  const tailFanGeometry = new THREE.ConeGeometry(0.5, 0.8, 4);
-  const tailFanMaterial = new THREE.MeshPhongMaterial({ color: darkColor, shininess: 60 });
-  const tailFan = new THREE.Mesh(tailFanGeometry, tailFanMaterial);
-  tailFan.position.set(0, -1.9, -0.7);
-  tailFan.rotation.x = Math.PI * 0.3;
-  pet.add(tailFan);
-  petParts.tail = tailFan;
+  // ========== 3. 尾巴（倒三角扇形） ==========
+  const tailMaterial = new THREE.MeshPhongMaterial({ 
+    color: mainColor, shininess: 80, specular: 0x333333, side: THREE.DoubleSide 
+  });
   
-  // ========== 头部特征 ==========
+  const tailShape = new THREE.Shape();
+  tailShape.moveTo(0, 0);
+  tailShape.quadraticCurveTo(0.4, -0.3, 0.3, -0.6);
+  tailShape.quadraticCurveTo(0, -0.45, -0.3, -0.6);
+  tailShape.quadraticCurveTo(-0.4, -0.3, 0, 0);
   
-  // 4. 眼睛（带眼柄）- 在头胸部上方
-  const eyeStalkGeometry = new THREE.CylinderGeometry(0.06, 0.08, 0.25, 12);
-  const eyeStalkMaterial = new THREE.MeshPhongMaterial({ color: mainColor });
+  const tailGeometry = new THREE.ShapeGeometry(tailShape);
+  tailGeometry.computeVertexNormals();
+  const tail = new THREE.Mesh(tailGeometry, tailMaterial);
+  tail.position.set(0, -1.7, -0.15);
+  pet.add(tail);
+  petParts.tail = tail;
   
-  const leftEyeStalk = new THREE.Mesh(eyeStalkGeometry, eyeStalkMaterial);
-  leftEyeStalk.position.set(-0.4, 0.75, 0.5);
-  leftEyeStalk.rotation.z = -0.15;
-  pet.add(leftEyeStalk);
-  petParts.leftEyeStalk = leftEyeStalk;
-  
-  const rightEyeStalk = new THREE.Mesh(eyeStalkGeometry, eyeStalkMaterial);
-  rightEyeStalk.position.set(0.4, 0.75, 0.5);
-  rightEyeStalk.rotation.z = 0.15;
-  pet.add(rightEyeStalk);
-  petParts.rightEyeStalk = rightEyeStalk;
-  
-  // 眼球（白色）
-  const eyeballGeometry = new THREE.SphereGeometry(0.12, 16, 16);
-  const eyeballMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+  // ========== 4. 眼睛（直接贴在头胸上） ==========
+  const eyeballGeometry = new THREE.SphereGeometry(0.28, 32, 32);
+  const eyeballMaterial = new THREE.MeshPhongMaterial({ color: white, shininess: 100, specular: 0x555555 });
   
   const leftEyeball = new THREE.Mesh(eyeballGeometry, eyeballMaterial);
-  leftEyeball.position.set(0, 0.15, 0);
-  leftEyeStalk.add(leftEyeball);
+  leftEyeball.position.set(-0.42, 0.25, 0.9);
+  pet.add(leftEyeball);
   petParts.leftEyeball = leftEyeball;
   
   const rightEyeball = new THREE.Mesh(eyeballGeometry, eyeballMaterial);
-  rightEyeball.position.set(0, 0.15, 0);
-  rightEyeStalk.add(rightEyeball);
+  rightEyeball.position.set(0.42, 0.25, 0.9);
+  pet.add(rightEyeball);
   petParts.rightEyeball = rightEyeball;
   
-  // 瞳孔（黑色，可缩放表达情绪）
-  const pupilGeometry = new THREE.SphereGeometry(0.06, 12, 12);
-  const pupilMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  // 瞳孔
+  const pupilGeometry = new THREE.SphereGeometry(0.16, 24, 24);
+  const pupilMaterial = new THREE.MeshBasicMaterial({ color: darkPupil });
   
   const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-  leftPupil.position.set(0, 0.02, 0.1);
+  leftPupil.position.set(0, 0.02, 0.25);
   leftEyeball.add(leftPupil);
   petParts.leftPupil = leftPupil;
   
   const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-  rightPupil.position.set(0, 0.02, 0.1);
+  rightPupil.position.set(0, 0.02, 0.25);
   rightEyeball.add(rightPupil);
   petParts.rightPupil = rightPupil;
   
-  // 5. 触角（2 根长的 + 2 根短的）
-  const antennaGeometry = new THREE.CylinderGeometry(0.02, 0.04, 1.0, 8);
-  const antennaMaterial = new THREE.MeshPhongMaterial({ color: darkColor });
+  // 高光
+  const highlightGeometry = new THREE.SphereGeometry(0.05, 12, 12);
+  const highlightMaterial = new THREE.MeshBasicMaterial({ color: white });
   
-  // 长触角（左侧）
-  const leftAntenna = new THREE.Mesh(antennaGeometry, antennaMaterial);
-  leftAntenna.position.set(-0.5, 0.9, 0.5);
-  leftAntenna.rotation.z = 0.3;
-  leftAntenna.rotation.x = -0.2;
-  pet.add(leftAntenna);
-  petParts.leftAntenna = leftAntenna;
+  const leftHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+  leftHighlight.position.set(0.05, 0.07, 0.26);
+  leftEyeball.add(leftHighlight);
   
-  // 长触角（右侧）
-  const rightAntenna = new THREE.Mesh(antennaGeometry, antennaMaterial);
-  rightAntenna.position.set(0.5, 0.9, 0.5);
-  rightAntenna.rotation.z = -0.3;
-  rightAntenna.rotation.x = -0.2;
-  pet.add(rightAntenna);
-  petParts.rightAntenna = rightAntenna;
+  const rightHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+  rightHighlight.position.set(0.05, 0.07, 0.26);
+  rightEyeball.add(rightHighlight);
   
-  // 短触角（内侧）
-  const shortAntennaGeometry = new THREE.CylinderGeometry(0.015, 0.03, 0.6, 8);
+  // ========== 5. 腮红 ==========
+  const blushGeometry = new THREE.SphereGeometry(0.1, 20, 20);
+  blushGeometry.scale(1.3, 0.6, 0.7);
+  blushGeometry.computeVertexNormals();
+  const blushMaterial = new THREE.MeshPhongMaterial({ 
+    color: accentColor, transparent: true, opacity: 0.5, shininess: 70 
+  });
   
-  const leftShortAntenna = new THREE.Mesh(shortAntennaGeometry, antennaMaterial);
-  leftShortAntenna.position.set(-0.25, 0.95, 0.55);
-  leftShortAntenna.rotation.z = 0.15;
-  leftShortAntenna.rotation.x = -0.3;
-  pet.add(leftShortAntenna);
-  petParts.leftShortAntenna = leftShortAntenna;
+  const leftBlush = new THREE.Mesh(blushGeometry, blushMaterial);
+  leftBlush.position.set(-0.65, 0.05, 0.78);
+  pet.add(leftBlush);
+  petParts.leftBlush = leftBlush;
   
-  const rightShortAntenna = new THREE.Mesh(shortAntennaGeometry, antennaMaterial);
-  rightShortAntenna.position.set(0.25, 0.95, 0.55);
-  rightShortAntenna.rotation.z = -0.15;
-  rightShortAntenna.rotation.x = -0.3;
-  pet.add(rightShortAntenna);
-  petParts.rightShortAntenna = rightShortAntenna;
+  const rightBlush = new THREE.Mesh(blushGeometry, blushMaterial);
+  rightBlush.position.set(0.65, 0.05, 0.78);
+  pet.add(rightBlush);
+  petParts.rightBlush = rightBlush;
   
-  // 6. 嘴巴（可变形表达情绪）
-  const mouthGeometry = new THREE.TorusGeometry(0.12, 0.02, 8, 16, Math.PI);
-  const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x330000 });
+  // ========== 6. 嘴巴 ==========
+  const mouthGeometry = new THREE.TorusGeometry(0.07, 0.02, 8, 16, Math.PI);
+  const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x883344 });
   const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
-  mouth.position.set(0, 0.3, 0.8);
-  mouth.rotation.z = Math.PI;
+  mouth.position.set(0, -0.05, 0.95);
+  mouth.rotation.x = Math.PI;
   pet.add(mouth);
   petParts.mouth = mouth;
   
-  // ========== 钳子（标志性的大钳子） ==========
-  
-  // 7. 大钳子（不对称，更真实）
-  const createClaw = (size) => {
+  // ========== 7. 钳子（紧贴头胸两侧） ==========
+  const createClaw = (size, side) => {
     const clawGroup = new THREE.Group();
     
-    // 钳子臂
-    const armGeometry = new THREE.CylinderGeometry(0.07 * size, 0.1 * size, 0.5 * size, 12);
-    const armMaterial = new THREE.MeshPhongMaterial({ color: mainColor });
+    const armGeometry = new THREE.CylinderGeometry(0.09 * size, 0.11 * size, 0.3 * size, 16);
+    const armMaterial = new THREE.MeshPhongMaterial({ color: mainColor, shininess: 85, specular: 0x444444 });
     const arm = new THREE.Mesh(armGeometry, armMaterial);
-    arm.position.y = 0.25 * size;
+    arm.position.y = 0.15 * size;
     clawGroup.add(arm);
     
-    // 钳子手掌
-    const palmGeometry = new THREE.BoxGeometry(0.22 * size, 0.28 * size, 0.13 * size);
-    const palmMaterial = new THREE.MeshPhongMaterial({ color: mainColor });
+    const palmGeometry = new THREE.SphereGeometry(0.14 * size, 20, 20);
+    palmGeometry.scale(1, 1.15, 0.85);
+    palmGeometry.computeVertexNormals();
+    const palmMaterial = new THREE.MeshPhongMaterial({ color: mainColor, shininess: 85, specular: 0x444444 });
     const palm = new THREE.Mesh(palmGeometry, palmMaterial);
-    palm.position.y = 0.65 * size;
+    palm.position.y = 0.4 * size;
     clawGroup.add(palm);
     
-    // 钳子手指（2 个）
-    const fingerGeometry = new THREE.ConeGeometry(0.035 * size, 0.22 * size, 8);
-    const fingerMaterial = new THREE.MeshPhongMaterial({ color: darkColor });
+    const fingerGeometry = new THREE.CapsuleGeometry(0.035 * size, 0.12 * size, 8, 8);
+    const fingerMaterial = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 75 });
     
     const finger1 = new THREE.Mesh(fingerGeometry, fingerMaterial);
-    finger1.position.set(0, 0.85 * size, 0.04 * size);
-    finger1.rotation.x = -0.25;
+    finger1.position.set(0, 0.52 * size, 0.025 * size);
+    finger1.rotation.x = -0.3;
     clawGroup.add(finger1);
     
     const finger2 = new THREE.Mesh(fingerGeometry, fingerMaterial);
-    finger2.position.set(0, 0.85 * size, -0.04 * size);
-    finger2.rotation.x = 0.25;
+    finger2.position.set(0, 0.52 * size, -0.025 * size);
+    finger2.rotation.x = 0.3;
     clawGroup.add(finger2);
     
     return clawGroup;
   };
   
-  // 左钳子（稍大）
-  const leftClaw = createClaw(1.05);
-  leftClaw.position.set(-1.0, 0.2, 0.6);
+  const leftClaw = createClaw(1.0, -1);
+  leftClaw.position.set(-0.85, -0.05, 0.55);
   leftClaw.rotation.z = 0.4;
-  leftClaw.rotation.x = -0.15;
   pet.add(leftClaw);
   petParts.leftClaw = leftClaw;
   
-  // 右钳子（稍小）
-  const rightClaw = createClaw(0.95);
-  rightClaw.position.set(1.0, 0.2, 0.6);
+  const rightClaw = createClaw(1.0, 1);
+  rightClaw.position.set(0.85, -0.05, 0.55);
   rightClaw.rotation.z = -0.4;
-  rightClaw.rotation.x = -0.15;
   pet.add(rightClaw);
   petParts.rightClaw = rightClaw;
   
-  // ========== 步足（简化版，每侧 3 条） ==========
+  // ========== 8. 触角（从头部上方伸出） ==========
+  const antennaGeometry = new THREE.CylinderGeometry(0.015, 0.025, 0.7, 12);
+  const antennaMaterial = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 80 });
   
-  const legGeometry = new THREE.CylinderGeometry(0.025, 0.035, 0.35, 8);
-  const legMaterial = new THREE.MeshPhongMaterial({ color: darkColor });
+  const leftAntenna = new THREE.Mesh(antennaGeometry, antennaMaterial);
+  leftAntenna.position.set(-0.4, 0.65, 0.7);
+  leftAntenna.rotation.z = 0.3;
+  leftAntenna.rotation.x = -0.15;
+  pet.add(leftAntenna);
+  petParts.leftAntenna = leftAntenna;
+  
+  const rightAntenna = new THREE.Mesh(antennaGeometry, antennaMaterial);
+  rightAntenna.position.set(0.4, 0.65, 0.7);
+  rightAntenna.rotation.z = -0.3;
+  rightAntenna.rotation.x = -0.15;
+  pet.add(rightAntenna);
+  petParts.rightAntenna = rightAntenna;
+  
+  // ========== 9. 腿部（从腹部下方伸出） ==========
+  const legGeometry = new THREE.CapsuleGeometry(0.035, 0.2, 8, 8);
+  const legMaterial = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 75 });
   
   for (let i = 0; i < 3; i++) {
-    // 左侧腿 - 从腹部连接
     const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    leftLeg.position.set(-0.5, -0.9 - i * 0.35, -0.2);
+    leftLeg.position.set(-0.55 - i * 0.08, -0.65 - i * 0.35, -0.1);
     leftLeg.rotation.z = 0.5;
-    leftLeg.rotation.x = -0.2;
+    leftLeg.rotation.x = -0.15;
     pet.add(leftLeg);
     petParts[`leftLeg${i}`] = leftLeg;
     
-    // 右侧腿
     const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-    rightLeg.position.set(0.5, -0.9 - i * 0.35, -0.2);
+    rightLeg.position.set(0.55 + i * 0.08, -0.65 - i * 0.35, -0.1);
     rightLeg.rotation.z = -0.5;
-    rightLeg.rotation.x = -0.2;
+    rightLeg.rotation.x = -0.15;
     pet.add(rightLeg);
     petParts[`rightLeg${i}`] = rightLeg;
   }
   
-  // 添加到场景
   scene.add(pet);
   
-  // 初始表情
-  updateExpression('idle');
+  console.log('✅ 哈基虾创建完成！');
 }
 
-// ==================== 更新表情 ====================
-function updateExpression(state) {
-  // 优先使用情绪系统的配置
-  if (emotionSystem) {
-    const config = emotionSystem.getBlendedConfig(petParts);
-    
-    if (petParts.leftPupil && petParts.rightPupil) {
-      petParts.leftPupil.scale.setScalar(config.eyeScale);
-      petParts.rightPupil.scale.setScalar(config.eyeScale);
+// ==================== 初始化所有模块 ====================
+function initModules() {
+  // 1. 颜色渲染器
+  colorRenderer = new ColorRenderer(petParts);
+  
+  // 2. 情绪系统
+  emotionSystem = new EmotionState();
+  new EmotionTrigger(emotionSystem, petParts);
+  
+  // 3. 粒子系统
+  particleManager = new ParticleSystemManager(scene);
+  
+  // 4. 内心戏管理器
+  innerVoiceManager = new InnerVoiceManager({
+    sendToOpenClaw: async (message) => {
+      if (websocket?.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify(message));
+      }
+    },
+    showBubble: (message, autoHide) => {
+      showBubble(message, autoHide);
     }
-    
-    if (petParts.leftEyeStalk && petParts.rightEyeStalk) {
-      petParts.leftEyeStalk.position.y = config.eyeY;
-      petParts.rightEyeStalk.position.y = config.eyeY;
-    }
-    
-    if (petParts.mouth) {
-      petParts.mouth.rotation.z = config.mouthRotate;
-      petParts.mouth.scale.setScalar(config.mouthScale);
-    }
-    
-    // 更新触角速度
-    petParts.antennaSpeed = config.antennaSpeed;
-    
-    // 更新颜色（根据情绪强度）
-    if (petParts.cephalothorax) {
-      const targetColor = new THREE.Color(config.color);
-      petParts.cephalothorax.material.color.lerp(targetColor, 0.1);
-    }
-  } else {
-    // 回退到旧的表情系统
-    const expr = EXPRESSIONS[state] || EXPRESSIONS.idle;
-    
-    if (petParts.leftPupil && petParts.rightPupil) {
-      petParts.leftPupil.scale.setScalar(expr.eyeScale);
-      petParts.rightPupil.scale.setScalar(expr.eyeScale);
-    }
-    
-    if (petParts.leftEyeStalk && petParts.rightEyeStalk) {
-      petParts.leftEyeStalk.position.y = expr.eyeY;
-      petParts.rightEyeStalk.position.y = expr.eyeY;
-    }
-    
-    if (petParts.mouth) {
-      petParts.mouth.rotation.z = expr.mouthRotate;
-      petParts.mouth.scale.setScalar(expr.mouthScale);
-    }
-    
-    // 触角动画（紧张时抖动）
-    const antennaSpeed = state === 'critical' || state === 'high' ? 0.15 : 0.03;
-    petParts.antennaSpeed = antennaSpeed;
-  }
+  });
+  
+  // 5. 话题生成器
+  topicGenerator = new TopicGenerator({
+    sendToOpenClaw: async (prompt, sessionKey) => {
+      if (window.electronAPI?.sendToOpenClaw) {
+        return await window.electronAPI.sendToOpenClaw(prompt, sessionKey);
+      }
+      return { success: false, error: 'IPC not available' };
+    },
+    showBubble: (message) => {
+      showBubble(message, true);
+    },
+    hasTavilyAPI: false,
+    memoryPath: ''
+  });
+  
+  console.log('✅ 所有模块初始化完成！');
 }
 
-// ==================== 状态切换 ====================
-function changeState(newState) {
-  currentState = newState;
+// ==================== 鼠标控制 ====================
+let isLeftDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let windowStartX = 0, windowStartY = 0;
+let clickStartTime = 0;
+const LONG_CLICK_THRESHOLD = 200; // 200ms 以上算长按
+
+function setupMouseControls() {
+  const canvas = renderer.domElement;
   
-  // 更新虾的颜色
-  const targetColor = COLORS[newState];
-  if (petParts.cephalothorax) {
-    petParts.cephalothorax.material.color.setHex(targetColor);
-  }
-  
-  for (let i = 0; i < 3; i++) {
-    const segment = petParts[`abdomen${i}`];
-    if (segment) {
-      segment.material.color.setHex(i % 2 === 0 ? targetColor : targetColor - 0x111111);
+  // 左键按下 - 开始拖动或准备单击
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { // 左键
+      clickStartTime = Date.now();
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      isLeftDragging = false;
+      
+      // 获取窗口当前位置
+      windowStartX = window.screenX || 0;
+      windowStartY = window.screenY || 0;
+    } else if (e.button === 2) { // 右键
+      rotateStartX = e.clientX;
+      rotateStartY = e.clientY;
+      isRotating = true;
     }
-  }
+  });
   
-  if (petParts.leftClaw) {
-    petParts.leftClaw.children.forEach(child => {
-      if (child.material) child.material.color.setHex(targetColor);
+  // 左键移动 - 拖动窗口
+  canvas.addEventListener('mousemove', (e) => {
+    if (e.button === 0) {
+      const deltaX = e.clientX - dragStartX;
+      const deltaY = e.clientY - dragStartY;
+      
+      // 如果移动距离超过阈值，认为是拖动而不是点击
+      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+        isLeftDragging = true;
+        
+        // 计算新窗口位置
+        const newX = windowStartX + deltaX;
+        const newY = windowStartY + deltaY;
+        
+        // 通过 Electron API 移动窗口
+        if (window.electronAPI && window.electronAPI.setWindowPosition) {
+          window.electronAPI.setWindowPosition(newX, newY);
+        }
+      }
+    } else if (isRotating && pet) {
+      const deltaX = (e.clientX - rotateStartX) * 0.008;
+      const deltaY = (e.clientY - rotateStartY) * 0.008;
+      pet.rotation.y += deltaX;
+      pet.rotation.x = Math.max(-0.5, Math.min(0.5, pet.rotation.x + deltaY * 0.3));
+      rotateStartX = e.clientX;
+      rotateStartY = e.clientY;
+    }
+  });
+  
+  // 左键释放 - 判断是单击还是拖动
+  canvas.addEventListener('mouseup', (e) => {
+    if (e.button === 0) {
+      const clickDuration = Date.now() - clickStartTime;
+      
+      // 如果不是拖动且是短按，生成话题
+      if (!isLeftDragging && clickDuration < LONG_CLICK_THRESHOLD) {
+        console.log('🖱️ 左键单击，生成话题...');
+        if (topicGenerator) {
+          topicGenerator.generateTopic().then(topic => {
+            if (topic) {
+              console.log('✅ 生成话题:', topic);
+            }
+          });
+        }
+      }
+      isLeftDragging = false;
+    } else if (e.button === 2) {
+      isRotating = false;
+    }
+  });
+  
+  canvas.addEventListener('mouseleave', () => {
+    isRotating = false;
+    isLeftDragging = false;
+  });
+  
+  // 右键菜单
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showContextMenu(e.clientX, e.clientY);
+  });
+}
+
+function showContextMenu(x, y) {
+  const menu = document.getElementById('context-menu');
+  if (menu) {
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.classList.remove('hidden');
+    
+    menu.querySelectorAll('.menu-item').forEach(item => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const action = item.getAttribute('data-action');
+        if (action) handleMenuAction(action);
+        menu.classList.add('hidden');
+      };
     });
   }
-  if (petParts.rightClaw) {
-    petParts.rightClaw.children.forEach(child => {
-      if (child.material) child.material.color.setHex(targetColor);
-    });
-  }
-  
-  // 更新表情
-  updateExpression(newState);
-  
-  // 更新水箱状态（水位 + 颜色）
-  updateWaterTank(newState);
 }
 
-// ==================== 更新水箱 ====================
-function updateWaterTank(state) {
-  const targetLevel = WATER_LEVELS[state];
-  const targetColor = WATER_COLORS[state];
-  const stateColor = STATE_COLORS[state];
-  
-  // 平滑过渡水位
-  if (petParts.waterSurface && petParts.waterBody) {
-    const surfaceTargetY = targetLevel;
-    const bodyTargetHeight = targetLevel;
-    const bodyTargetY = targetLevel / 2 - 1.5;
-    
-    waterSurface.position.y += (surfaceTargetY - waterSurface.position.y) * 0.1;
-    
-    petParts.waterBody.geometry.dispose();
-    petParts.waterBody.geometry = new THREE.CylinderGeometry(3.4, 3.4, bodyTargetHeight, 32);
-    petParts.waterBody.position.y = bodyTargetY;
-    
-    petParts.waterSurface.material.color.lerp(new THREE.Color(targetColor), 0.15);
-    petParts.waterBody.material.color.lerp(new THREE.Color(targetColor), 0.15);
-  }
-  
-  // 更新背景颜色（状态渐变色）
-  if (petParts.stateBg) {
-    petParts.stateBg.material.color.lerp(new THREE.Color(stateColor), 0.1);
-    // 状态越差，背景越不透明
-    const targetOpacity = state === 'critical' ? 0.4 : 0.15;
-    petParts.stateBg.material.opacity += (targetOpacity - petParts.stateBg.material.opacity) * 0.1;
+function handleMenuAction(action) {
+  console.log('菜单动作:', action);
+  switch(action) {
+    case 'talk':
+      if (websocket?.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({ type: 'chat', message: '你好！' }));
+      }
+      break;
+    case 'rotate':
+      if (pet) {
+        let count = 0;
+        const interval = setInterval(() => {
+          pet.rotation.y += 0.3;
+          if (++count >= 20) clearInterval(interval);
+        }, 50);
+      }
+      break;
+    case 'status':
+      showBubble(`状态：${colorRenderer.currentLevel}`, false);
+      break;
+    case 'openclaw':
+      // 打开最新生成的话题（如果有的话）
+      if (topicGenerator) {
+        const sessionKey = topicGenerator.getFullSessionKey();
+        console.log('🚀 打开 OpenClaw，会话 Key:', sessionKey);
+        
+        if (window.electronAPI && window.electronAPI.openDesktopPetSession) {
+          window.electronAPI.openDesktopPetSession(sessionKey)
+            .then(result => {
+              if (result.success) {
+                console.log('✅ 已打开 OpenClaw 会话');
+                // 标记话题为已打开
+                topicGenerator.markAsOpened();
+              } else {
+                console.error('❌ 打开会话失败:', result.error);
+              }
+            })
+            .catch(err => {
+              console.error('❌ 打开会话错误:', err);
+            });
+        }
+      }
+      break;
+    case 'hide':
+      if (renderer?.domElement) renderer.domElement.style.display = 'none';
+      break;
+    case 'quit':
+      if (window.electronAPI?.quitApp) window.electronAPI.quitApp();
+      break;
   }
 }
+
+document.addEventListener('click', () => {
+  const menu = document.getElementById('context-menu');
+  if (menu) menu.classList.add('hidden');
+});
 
 // ==================== WebSocket 连接 ====================
-let websocketReconnectTimer = null;
-let websocketConnectCount = 0;
-
 function connectWebSocket() {
-  if (websocketReconnectTimer) {
-    clearTimeout(websocketReconnectTimer);
-    websocketReconnectTimer = null;
-  }
-  
   if (websocket) {
-    websocket.close();
-    websocket = null;
+    try { websocket.close(); } catch(e) {}
   }
   
-  try {
-    // 尝试多个端口（8765-8770）
-    const ports = [8765, 8767, 8768, 8769, 8770];
-    let currentPortIndex = 0;
+  const ports = [8765, 8766, 8767, 8768, 8769, 8770];
+  let currentPortIndex = 0;
+  
+  function tryConnect() {
+    if (currentPortIndex >= ports.length) {
+      console.log('端口全满，使用模拟模式');
+      simulateSystemStatus();
+      return;
+    }
     
-    function tryConnect() {
-      if (currentPortIndex >= ports.length) {
-        console.log('所有端口尝试失败，使用模拟模式');
-        simulateSystemStatus();
-        return;
-      }
-      
-      const port = ports[currentPortIndex];
-      console.log(`尝试连接 ws://localhost:${port} (${currentPortIndex + 1}/${ports.length})`);
-      
+    const port = ports[currentPortIndex];
+    console.log(`连接端口 ${port}...`);
+    
+    try {
       websocket = new WebSocket(`ws://localhost:${port}`);
       
       websocket.onopen = () => {
-        console.log(`WebSocket 连接成功 (端口 ${port})`);
-        updateStatus('已连接', 'idle');
+        console.log(`✅ 连接成功 (${port})`);
+        hideLoading();
       };
       
       websocket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'topic_response') {
-          showBubble(data.message, true);
-          isWaitingResponse = false;
-        } else if (data.type === 'auto_chat') {
-          showBubble(data.message, true);
-          if (window.electronAPI) {
-            window.electronAPI.playSound('notification');
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'topic_response' || data.type === 'auto_chat') {
+            showBubble(data.message || data.text, true);
+          } else if (data.type === 'system_status') {
+            handleSystemStatus(data);
           }
-        } else if (data.type === 'system_status') {
-          handleSystemStatus(data);
-          
-          // 保存系统状态，用于对话时引用
-          systemStatus = {
-            cpu: data.cpu || 0,
-            memory: data.memory || 0,
-            gpu: data.gpu || 0,
-            gpu_temp: data.gpu_temp || 0,
-            network: data.network || { upload: 0, download: 0 },
-            performance_score: data.performance_score || 100,
-            performance_level: data.performance_level || '空闲',
-            level_changed: data.level_changed || false
-          };
-          
-          // 颜色实时更新（每秒）
-          if (data.level_changed && colorRenderer) {
-            colorRenderer.updateColor(data.performance_level);
-          }
-          
-          // 内心戏检查（静默模式）
-          if (innerVoiceManager) {
-            innerVoiceManager.onPerformanceUpdate(systemStatus);
-          }
-        }
+        } catch(e) {}
       };
       
       websocket.onclose = () => {
-        console.log('WebSocket 连接关闭');
-        updateStatus('未连接', 'critical');
-        // 端口断开，尝试下一个
         currentPortIndex++;
-        websocketReconnectTimer = setTimeout(tryConnect, 1000);
+        if (currentPortIndex < ports.length) setTimeout(tryConnect, 300);
       };
       
-      websocket.onerror = (error) => {
-        console.error(`WebSocket 错误 (端口 ${port}):`, error);
-        updateStatus('连接错误', 'critical');
-      };
-    }
-    
-    tryConnect();
-    websocketConnectCount = 0;
-  } catch (error) {
-    console.error('WebSocket 连接失败:', error);
-    websocketConnectCount++;
-    if (websocketConnectCount < 5) {
-      // 最多重试 5 次，每次间隔增加
-      const delay = Math.min(1000 * websocketConnectCount, 5000);
-      console.log(`WebSocket 将在 ${delay}ms 后重试 (${websocketConnectCount}/5)`);
-      websocketReconnectTimer = setTimeout(connectWebSocket, delay);
-    } else {
-      console.log('WebSocket 连接失败，使用模拟模式');
-      simulateSystemStatus();
+      websocket.onerror = () => { currentPortIndex++; };
+    } catch(e) {
+      currentPortIndex++;
+      tryConnect();
     }
   }
+  
+  tryConnect();
 }
 
-// ==================== 处理系统状态 ====================
 function handleSystemStatus(data) {
-  const { cpu, memory, gpu, state } = data;
-  if (state !== currentState) {
-    changeState(state);
+  const { cpu, memory, gpu, performance_score, performance_level } = data;
+  
+  // 使用颜色渲染器更新颜色
+  if (colorRenderer && performance_level) {
+    colorRenderer.updateColor(performance_level);
   }
+  
+  // 更新状态指示器
   updateStatusIndicator(cpu, memory);
 }
 
-// ==================== 模拟系统状态 ====================
 function simulateSystemStatus() {
-  const states = ['idle', 'normal', 'busy', 'high', 'critical'];
-  const weights = [0.4, 0.3, 0.2, 0.08, 0.02];
-  
+  const levels = ['空闲', '忙碌', '紧张', '夯爆了'];
   setInterval(() => {
-    const random = Math.random();
-    let cumulative = 0;
-    let state = 'idle';
-    
-    for (let i = 0; i < weights.length; i++) {
-      cumulative += weights[i];
-      if (random < cumulative) {
-        state = states[i];
-        break;
-      }
-    }
-    
-    const cpu = { idle: 10, normal: 35, busy: 65, high: 85, critical: 95 }[state];
-    
-    if (state !== currentState) {
-      changeState(state);
-    }
-    
-    updateStatusIndicator(cpu, 50);
-  }, 3000);
+    const level = levels[Math.floor(Math.random() * levels.length)];
+    if (colorRenderer) colorRenderer.updateColor(level);
+  }, 5000);
 }
 
-// ==================== 更新状态指示器 ====================
 function updateStatusIndicator(cpu, memory) {
   const statusDot = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
-  statusDot.className = `status-${currentState}`;
-  statusText.textContent = `${currentState.toUpperCase()} | CPU: ${cpu}% | MEM: ${memory}%`;
+  const colors = { '空闲': '#B0C4DE', '忙碌': '#FFD700', '紧张': '#FF8C00', '夯爆了': '#FF0000' };
+  if (statusDot) statusDot.style.backgroundColor = colors[colorRenderer?.currentLevel] || '#B0C4DE';
+  if (statusText) statusText.textContent = colorRenderer?.currentLevel || '空闲';
 }
 
-function updateStatus(text, state) {
-  const statusText = document.getElementById('status-text');
-  statusText.textContent = text;
+function hideLoading() {
+  const loading = document.getElementById('loading');
+  if (loading) loading.style.display = 'none';
 }
 
-// ==================== 显示对话气泡 ====================
-let currentTopic = '';
-
-function showBubble(text, isClickable = false) {
+function showBubble(message, autoHide = true) {
   const bubble = document.getElementById('speech-bubble');
-  const bubbleText = document.getElementById('bubble-text');
-  bubbleText.textContent = text;
-  currentTopic = text;
-  
-  if (isClickable) {
-    bubble.style.cursor = 'pointer';
-    bubble.title = '双击打开聊天';
-  } else {
-    bubble.style.cursor = 'default';
-  }
-  
-  bubble.classList.remove('hidden');
-  
-  if (!isClickable) {
-    setTimeout(() => {
-      bubble.classList.add('hidden');
-    }, 3000);
+  const text = document.getElementById('bubble-text');
+  if (bubble && text) {
+    text.textContent = message;
+    bubble.classList.remove('hidden');
+    if (autoHide) setTimeout(() => bubble.classList.add('hidden'), 5000);
   }
 }
 
-// ==================== 事件监听 ====================
-function setupEvents() {
-  const canvas = document.getElementById('canvas-container');
-  const contextMenu = document.getElementById('context-menu');
+// ==================== 初始化 ====================
+function init() {
+  console.log('🦞 哈基虾初始化...');
   
-  let clickTimer = null;
-  let lastClickTime = 0;
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, -0.3, 5);
   
-  // ========== 鼠标按下 - 开始长按检测 ==========
-  canvas.addEventListener('mousedown', (event) => {
-    if (event.button !== 0) return; // 只处理左键
-    
-    // 如果在拖拽窗口，不触发旋转
-    if (event.target.closest('#context-menu')) return;
-    
-    rotationStartX = event.clientX;
-    rotationStartY = event.clientY;
-    
-    // 启动长按计时器
-    longPressTimer = setTimeout(() => {
-      isRotating = true;
-      canvas.style.cursor = 'grabbing';
-      showBubble('🔄 拖动查看我的全身~', false);
-    }, LONG_PRESS_DELAY);
-  });
+  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 0);
+  renderer.domElement.style.background = 'transparent';
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
   
-  // ========== 鼠标移动 - 处理旋转 ==========
-  canvas.addEventListener('mousemove', (event) => {
-    if (!isRotating) return;
-    
-    const deltaX = event.clientX - rotationStartX;
-    const deltaY = event.clientY - rotationStartY;
-    
-    // 更新旋转角度
-    petRotationY += deltaX * 0.01; // 左右拖动绕 Y 轴旋转
-    petRotationX += deltaY * 0.01; // 上下拖动绕 X 轴旋转
-    
-    // 限制 X 轴旋转角度（避免翻转）
-    petRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, petRotationX));
-    
-    // 应用旋转
-    if (pet) {
-      pet.rotation.x = petRotationX;
-      pet.rotation.y = petRotationY;
-    }
-    
-    rotationStartX = event.clientX;
-    rotationStartY = event.clientY;
-  });
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+  scene.add(ambientLight);
   
-  // ========== 鼠标松开 - 取消长按 ==========
-  canvas.addEventListener('mouseup', (event) => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-    }
-    
-    if (isRotating) {
-      isRotating = false;
-      wasLongPress = true; // 标记本次是长按，不是单击
-      canvas.style.cursor = 'pointer';
-    }
-  });
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(3, 5, 5);
+  scene.add(directionalLight);
   
-  // ========== 鼠标离开窗口 - 取消旋转 ==========
-  canvas.addEventListener('mouseleave', () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-    }
-    isRotating = false;
-    canvas.style.cursor = 'pointer';
-  });
+  const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
+  backLight.position.set(-3, 2, -3);
+  scene.add(backLight);
   
-  // ========== 原有的单击/双击处理 ==========
-  canvas.addEventListener('click', (event) => {
-    if (event.button !== 0) return;
-    
-    // 如果刚结束长按旋转，不触发单击（关键修复！）
-    if (wasLongPress) {
-      wasLongPress = false; // 重置标志
-      return;
-    }
-    
-    const now = Date.now();
-    const timeSinceLastClick = now - lastClickTime;
-    lastClickTime = now;
-    
-    if (clickTimer) {
-      clearTimeout(clickTimer);
-      clickTimer = null;
-      return;
-    }
-    
-    clickTimer = setTimeout(() => {
-      clickTimer = null;
-      handleSingleClick();
-    }, 300);
-  });
-  
-  function handleSingleClick() {
-    if (isWaitingResponse) {
-      showBubble("💭 正在思考中，稍等一下嘛~", false);
-      return;
-    }
-    
-    // 使用话题生成器（带防抖和概率分配）
-    if (topicGenerator) {
-      showBubble("💭 思考中...", true);
-      
-      topicGenerator.generateTopic()
-        .then(topic => {
-          if (topic) {
-            showBubble(topic, true);
-            // 触发粒子特效（根据当前情绪）
-            if(particleManager && emotionSystem) {
-              particleManager.triggerEffect(emotionSystem.currentEmotion, pet.position);
-            }
-          } else {
-            showBubble("⚠️ 网络开小差了，等下再聊吧～", false);
-          }
-        })
-        .catch(error => {
-          console.error('话题生成失败:', error);
-          showBubble("⚠️ 出错了，等下再试吧～", false);
-        });
-      
-      window.electronAPI.playSound('click');
-    } else {
-      // 降级：没有话题生成器时使用简单 Prompt
-      showBubble("💭 思考中...", true);
-      isWaitingResponse = true;
-      
-      window.electronAPI.sendToOpenClaw('（用 1-2 句话回复，50 字以内，口语化）和我聊聊天吧～')
-        .then(result => {
-          isWaitingResponse = false;
-          if (result.success) {
-            const reply = result.reply.length > 100 ? result.reply.substring(0, 100) + '...' : result.reply;
-            showBubble(reply, true);
-          } else {
-            showBubble("⚠️ 网络开小差了，等下再聊吧～", false);
-          }
-        })
-        .catch(error => {
-          isWaitingResponse = false;
-          console.error('OpenClaw error:', error);
-          showBubble("⚠️ 出错了，等下再试吧～", false);
-        });
-      
-      window.electronAPI.playSound('click');
-    }
-  }
-  
-  canvas.addEventListener('dblclick', (event) => {
-    if (event.button === 0) {
-      if (window.electronAPI) {
-        window.electronAPI.openOpenClaw();
-      }
-      showBubble("打开 OpenClaw 啦~ 🚀");
-    }
-  });
-  
-  canvas.addEventListener('contextmenu', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    contextMenu.style.left = `${event.clientX}px`;
-    contextMenu.style.top = `${event.clientY}px`;
-    contextMenu.classList.remove('hidden');
-  });
-  
-  document.addEventListener('click', (event) => {
-    if (!contextMenu.contains(event.target)) {
-      contextMenu.classList.add('hidden');
-    }
-  });
-  
-  contextMenu.querySelectorAll('.menu-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const action = item.dataset.action;
-      handleMenuAction(action);
-      contextMenu.classList.add('hidden');
-    });
-  });
-  
-  // 窗口拖拽（使用右键或中键，避免与旋转冲突）
-  let isDragging = false;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
-  
-  canvas.addEventListener('mousedown', (event) => {
-    if ((event.button === 2 || event.button === 1) && !event.target.closest('#context-menu')) {
-      isDragging = true;
-      dragOffsetX = event.screenX;
-      dragOffsetY = event.screenY;
-      event.preventDefault();
-    }
-  });
-  
-  document.addEventListener('mousemove', (event) => {
-    if (!isDragging) return;
-    
-    const deltaX = event.screenX - dragOffsetX;
-    const deltaY = event.screenY - dragOffsetY;
-    
-    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-      if (window.electronAPI) {
-        window.electronAPI.moveWindow(event.screenX, event.screenY, deltaX, deltaY);
-      }
-      dragOffsetX = event.screenX;
-      dragOffsetY = event.screenY;
-    }
-  });
-  
-  document.addEventListener('mouseup', () => {
-    isDragging = false;
-  });
-  
-  canvas.addEventListener('wheel', (event) => {
-    event.preventDefault();
-    const scale = pet.scale.x * (event.deltaY > 0 ? 0.9 : 1.1);
-    pet.scale.set(scale, scale, scale);
-  });
+  createPet();
+  initModules();
+  setupMouseControls();
+  connectWebSocket();
   
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -1006,199 +577,45 @@ function setupEvents() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
   
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'F12') {
-      event.preventDefault();
-      if (window.electronAPI) {
-        window.electronAPI.toggleVisibility();
-      }
-      isHidden = !isHidden;
-      if (isHidden) {
-        showBubble("已隐藏~ 再按 F12 出现哦~ 👻");
-      }
-    }
-  });
+  animate();
+  
+  console.log('✅ 完成！');
 }
 
-// ==================== 菜单动作处理 ====================
-function handleMenuAction(action) {
-  switch (action) {
-    case 'talk':
-      // 通过 WebSocket 请求 LLM 生成话题，不使用模板
-      if (websocket && websocket.readyState === WebSocket.OPEN) {
-        showBubble("💬 想聊什么呢？", false);
-        websocket.send(JSON.stringify({
-          type: 'generate_topic',
-          context: 'casual'
-        }));
-      } else {
-        showBubble("⚠️ 网络开小差了，等下再聊吧～", false);
-      }
-      break;
-    case 'rotate':
-      // 重置视角或展示旋转提示
-      petRotationX = 0;
-      petRotationY = 0;
-      if (pet) {
-        pet.rotation.x = 0;
-        pet.rotation.y = 0;
-      }
-      showBubble('🔄 视角已重置~ 长按左键拖动可以 360° 查看我哦！');
-      break;
-    case 'status':
-      showBubble(`当前状态：${currentState.toUpperCase()} 📊`);
-      break;
-    case 'openclaw':
-      if (window.electronAPI) {
-        // 标记话题为已打开（单对话模式）
-        if (topicGenerator) {
-          topicGenerator.markAsOpened();
-          // 打开桌面宠物会话（使用完整 sessionKey）
-          const sessionKey = topicGenerator.getFullSessionKey();
-          window.electronAPI.openDesktopPetSession(sessionKey);
-          console.log('🚀 打开话题:', sessionKey);
-        } else {
-          // 降级：没有话题生成器时打开默认会话
-          window.electronAPI.openDesktopPetSession('agent:main:openai-user:desktop-pet:default');
-        }
-      }
-      showBubble("打开 OpenClaw 啦~ 🚀");
-      break;
-    case 'hide':
-      if (window.electronAPI) {
-        window.electronAPI.toggleVisibility();
-      }
-      isHidden = !isHidden;
-      break;
-    case 'quit':
-      if (window.electronAPI) {
-        window.electronAPI.quitApp();
-      }
-      break;
-    
-    // ========== 情绪测试 ==========
-    case 'emotion-happy':
-      if (emotionSystem) {
-        emotionSystem.set(EMOTION_TYPES.HAPPY, 80, 5000, 'menu:test');
-        showBubble('😊 好开心呀～ 谢谢主人陪我玩！');
-        // 触发爱心粒子
-        if(particleManager) {
-          particleManager.triggerEffect('happy', pet.position);
-        }
-      }
-      break;
-    case 'emotion-idle':
-      if (emotionSystem) {
-        emotionSystem.set(EMOTION_TYPES.IDLE, 50, 0, 'menu:test');
-        showBubble('😌 悠闲自在～');
-      }
-      break;
-    case 'emotion-sleepy':
-      if (emotionSystem) {
-        emotionSystem.set(EMOTION_TYPES.SLEEPY, 70, 5000, 'menu:test');
-        showBubble('😴 好困啊～ 想睡觉了...');
-      }
-      break;
-    case 'emotion-excited':
-      if (emotionSystem) {
-        emotionSystem.set(EMOTION_TYPES.EXCITED, 90, 5000, 'menu:test');
-        showBubble('🎉 太兴奋啦！彩带飘飘～');
-        // 触发彩带粒子
-        if(particleManager) {
-          particleManager.triggerEffect('excited', pet.position);
-        }
-      }
-      break;
-  }
-}
-
-// ==================== 动画循环 ====================
-let lastFrameTime = Date.now();
-
+// ==================== 渲染循环 ====================
 function animate() {
   requestAnimationFrame(animate);
   
-  // 计算帧时间差（用于情绪更新）
-  const currentTime = Date.now();
-  const deltaTime = currentTime - lastFrameTime;
-  lastFrameTime = currentTime;
-  
-  // 更新情绪系统
-  if (emotionSystem) {
-    emotionSystem.update(deltaTime);
-  }
-  
-  // 更新粒子系统
-  if (particleManager) {
-    particleManager.update();
-  }
+  const time = Date.now() * 0.001;
   
   if (pet) {
-    const time = Date.now() * 0.001;
-    
-    // 根据状态调整动画参数
-    const stateParams = {
-      idle: { floatSpeed: 1, floatAmp: 0.1, shakeAmp: 0, rotSpeed: 0.5 },
-      normal: { floatSpeed: 1.2, floatAmp: 0.1, shakeAmp: 0, rotSpeed: 0.6 },
-      busy: { floatSpeed: 1.5, floatAmp: 0.12, shakeAmp: 0.02, rotSpeed: 0.8 },
-      high: { floatSpeed: 2, floatAmp: 0.15, shakeAmp: 0.05, rotSpeed: 1 },
-      critical: { floatSpeed: 3, floatAmp: 0.2, shakeAmp: 0.1, rotSpeed: 1.5 }
-    };
-    
-    const params = stateParams[currentState] || stateParams.idle;
-    
-    // 整体漂浮（幅度和速度随状态变化）
-    // 情绪系统会覆盖这些参数
-    const emotionConfig = emotionSystem ? emotionSystem.getBlendedConfig() : null;
-    const floatAmp = emotionConfig ? emotionConfig.floatAmp : params.floatAmp;
-    const floatSpeed = emotionConfig ? emotionConfig.floatSpeed : params.floatSpeed;
-    
+    // 漂浮动画
+    const floatSpeed = colorRenderer?.currentLevel === '夯爆了' ? 2.5 : 1;
+    const floatAmp = colorRenderer?.currentLevel === '夯爆了' ? 0.12 : 0.06;
     pet.position.y = Math.sin(time * floatSpeed) * floatAmp;
-    pet.rotation.z = Math.sin(time * params.rotSpeed) * 0.05;
     
-    // 紧张时身体抖动
-    if (params.shakeAmp > 0) {
-      pet.position.x = Math.sin(time * 10) * params.shakeAmp;
-    } else {
-      pet.position.x = 0;
-    }
-    
-    // 更新表情（根据情绪系统）
-    updateExpression(currentState);
-    
-    // 触角摆动（根据状态）
-    const antennaSpeed = petParts.antennaSpeed || 0.03;
+    // 触角摆动（使用情绪系统）
     if (petParts.leftAntenna) {
-      petParts.leftAntenna.rotation.z = 0.4 + Math.sin(time * 2) * antennaSpeed;
+      const speed = colorRenderer?.currentLevel === '夯爆了' ? 0.15 : 0.08;
+      petParts.leftAntenna.rotation.z = 0.3 + Math.sin(time * 2.5) * speed;
     }
     if (petParts.rightAntenna) {
-      petParts.rightAntenna.rotation.z = -0.4 + Math.sin(time * 2) * antennaSpeed;
+      const speed = colorRenderer?.currentLevel === '夯爆了' ? 0.15 : 0.08;
+      petParts.rightAntenna.rotation.z = -0.3 + Math.sin(time * 2.5) * speed;
     }
     
-    // 钳子微动
-    if (petParts.leftClaw) {
-      petParts.leftClaw.rotation.z = 0.5 + Math.sin(time * 0.8) * 0.03;
-    }
-    if (petParts.rightClaw) {
-      petParts.rightClaw.rotation.z = -0.5 + Math.sin(time * 0.8) * 0.03;
-    }
+    // 钳子摆动
+    if (petParts.leftClaw) petParts.leftClaw.rotation.z = 0.4 + Math.sin(time * 1.8) * 0.08;
+    if (petParts.rightClaw) petParts.rightClaw.rotation.z = -0.4 + Math.sin(time * 1.8) * 0.08;
     
     // 尾巴摆动
-    if (petParts.tail) {
-      petParts.tail.rotation.x = Math.PI * 0.3 + Math.sin(time * 1.5) * 0.05;
-    }
-  }
-  
-  // 水面波动效果（始终存在，紧张时更剧烈）
-  if (petParts.waterSurface) {
-    const waveSpeed = currentState === 'critical' ? 3 : 1;
-    const waveAmp = currentState === 'critical' ? 0.08 : 0.03;
-    petParts.waterSurface.rotation.x = Math.sin(time * waveSpeed) * waveAmp;
-    petParts.waterSurface.rotation.z = Math.cos(time * waveSpeed * 0.8) * waveAmp;
+    if (petParts.tail) petParts.tail.rotation.x = Math.PI * 0.1 + Math.sin(time * 1.5) * 0.1;
+    
+    // 更新粒子系统
+    if (particleManager) particleManager.update();
   }
   
   renderer.render(scene, camera);
 }
 
-// ==================== 启动 ====================
 init();
