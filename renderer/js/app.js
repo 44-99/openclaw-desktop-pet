@@ -48,7 +48,7 @@ function createPet() {
   pet.add(cephalothorax);
   petParts.cephalothorax = cephalothorax;
   
-  // ========== 2. 腹部（3 节，紧密连接） ==========
+  // ========== 2. 腹部（3 节，每节分开一点） ==========
   for (let i = 0; i < 3; i++) {
     const size = 0.7 - i * 0.08;
     const segmentGeometry = new THREE.SphereGeometry(size, 32, 32);
@@ -58,7 +58,8 @@ function createPet() {
       color: mainColor, shininess: 85, specular: 0x444444 
     });
     const segment = new THREE.Mesh(segmentGeometry, segmentMaterial);
-    segment.position.set(0, -0.5 - i * 0.45, -0.12);
+    // 第一节离头胸部远一点（-0.7），后面每节间隔 0.5
+    segment.position.set(0, -0.7 - i * 0.5, -0.12);
     pet.add(segment);
     petParts[`abdomen${i}`] = segment;
   }
@@ -81,44 +82,46 @@ function createPet() {
   pet.add(tail);
   petParts.tail = tail;
   
-  // ========== 4. 眼睛（直接贴在头胸上） ==========
-  const eyeballGeometry = new THREE.SphereGeometry(0.28, 32, 32);
+  // ========== 4. 眼睛（嵌入头胸，不要突出太多） ==========
+  // 减小眼球半径（0.28 → 0.18），让眼球更嵌入头胸部
+  const eyeballGeometry = new THREE.SphereGeometry(0.18, 32, 32);
   const eyeballMaterial = new THREE.MeshPhongMaterial({ color: white, shininess: 100, specular: 0x555555 });
   
   const leftEyeball = new THREE.Mesh(eyeballGeometry, eyeballMaterial);
-  leftEyeball.position.set(-0.42, 0.25, 0.9);
+  // 向头胸部内部移动（z 从 0.9 → 0.78）
+  leftEyeball.position.set(-0.42, 0.25, 0.78);
   pet.add(leftEyeball);
   petParts.leftEyeball = leftEyeball;
   
   const rightEyeball = new THREE.Mesh(eyeballGeometry, eyeballMaterial);
-  rightEyeball.position.set(0.42, 0.25, 0.9);
+  rightEyeball.position.set(0.42, 0.25, 0.78);
   pet.add(rightEyeball);
   petParts.rightEyeball = rightEyeball;
   
-  // 瞳孔
-  const pupilGeometry = new THREE.SphereGeometry(0.16, 24, 24);
+  // 瞳孔（同步缩小并嵌入）
+  const pupilGeometry = new THREE.SphereGeometry(0.11, 24, 24);
   const pupilMaterial = new THREE.MeshBasicMaterial({ color: darkPupil });
   
   const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-  leftPupil.position.set(0, 0.02, 0.25);
+  leftPupil.position.set(0, 0.02, 0.14);
   leftEyeball.add(leftPupil);
   petParts.leftPupil = leftPupil;
   
   const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-  rightPupil.position.set(0, 0.02, 0.25);
+  rightPupil.position.set(0, 0.02, 0.14);
   rightEyeball.add(rightPupil);
   petParts.rightPupil = rightPupil;
   
-  // 高光
-  const highlightGeometry = new THREE.SphereGeometry(0.05, 12, 12);
+  // 高光（同步缩小并嵌入）
+  const highlightGeometry = new THREE.SphereGeometry(0.035, 12, 12);
   const highlightMaterial = new THREE.MeshBasicMaterial({ color: white });
   
   const leftHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
-  leftHighlight.position.set(0.05, 0.07, 0.26);
+  leftHighlight.position.set(0.05, 0.07, 0.15);
   leftEyeball.add(leftHighlight);
   
   const rightHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
-  rightHighlight.position.set(0.05, 0.07, 0.26);
+  rightHighlight.position.set(0.05, 0.07, 0.15);
   rightEyeball.add(rightHighlight);
   
   // ========== 5. 腮红 ==========
@@ -148,49 +151,53 @@ function createPet() {
   pet.add(mouth);
   petParts.mouth = mouth;
   
-  // ========== 7. 钳子（紧贴头胸两侧） ==========
+  // ========== 7. 钳子（Q 版设计：放大 50%） ==========
   const createClaw = (size, side) => {
     const clawGroup = new THREE.Group();
     
-    const armGeometry = new THREE.CylinderGeometry(0.09 * size, 0.11 * size, 0.3 * size, 16);
+    // 钳子手臂（加粗）
+    const armGeometry = new THREE.CylinderGeometry(0.12 * size, 0.15 * size, 0.35 * size, 16);
     const armMaterial = new THREE.MeshPhongMaterial({ color: mainColor, shininess: 85, specular: 0x444444 });
     const arm = new THREE.Mesh(armGeometry, armMaterial);
-    arm.position.y = 0.15 * size;
+    arm.position.y = 0.18 * size;
     clawGroup.add(arm);
     
-    const palmGeometry = new THREE.SphereGeometry(0.14 * size, 20, 20);
-    palmGeometry.scale(1, 1.15, 0.85);
+    // 钳子手掌（放大，更圆润）
+    const palmGeometry = new THREE.SphereGeometry(0.2 * size, 20, 20);
+    palmGeometry.scale(1, 1.2, 0.9);
     palmGeometry.computeVertexNormals();
     const palmMaterial = new THREE.MeshPhongMaterial({ color: mainColor, shininess: 85, specular: 0x444444 });
     const palm = new THREE.Mesh(palmGeometry, palmMaterial);
-    palm.position.y = 0.4 * size;
+    palm.position.y = 0.5 * size;
     clawGroup.add(palm);
     
-    const fingerGeometry = new THREE.CapsuleGeometry(0.035 * size, 0.12 * size, 8, 8);
+    // 钳子手指（加粗，更明显）
+    const fingerGeometry = new THREE.CapsuleGeometry(0.05 * size, 0.15 * size, 8, 8);
     const fingerMaterial = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 75 });
     
     const finger1 = new THREE.Mesh(fingerGeometry, fingerMaterial);
-    finger1.position.set(0, 0.52 * size, 0.025 * size);
-    finger1.rotation.x = -0.3;
+    finger1.position.set(0, 0.65 * size, 0.03 * size);
+    finger1.rotation.x = -0.4;
     clawGroup.add(finger1);
     
     const finger2 = new THREE.Mesh(fingerGeometry, fingerMaterial);
-    finger2.position.set(0, 0.52 * size, -0.025 * size);
-    finger2.rotation.x = 0.3;
+    finger2.position.set(0, 0.65 * size, -0.03 * size);
+    finger2.rotation.x = 0.4;
     clawGroup.add(finger2);
     
     return clawGroup;
   };
   
-  const leftClaw = createClaw(1.0, -1);
-  leftClaw.position.set(-0.85, -0.05, 0.55);
-  leftClaw.rotation.z = 0.4;
+  // 钳子放大 50%
+  const leftClaw = createClaw(1.5, -1);
+  leftClaw.position.set(-0.95, -0.1, 0.5);
+  leftClaw.rotation.z = 0.3;
   pet.add(leftClaw);
   petParts.leftClaw = leftClaw;
   
-  const rightClaw = createClaw(1.0, 1);
-  rightClaw.position.set(0.85, -0.05, 0.55);
-  rightClaw.rotation.z = -0.4;
+  const rightClaw = createClaw(1.5, 1);
+  rightClaw.position.set(0.95, -0.1, 0.5);
+  rightClaw.rotation.z = -0.3;
   pet.add(rightClaw);
   petParts.rightClaw = rightClaw;
   
@@ -212,21 +219,26 @@ function createPet() {
   pet.add(rightAntenna);
   petParts.rightAntenna = rightAntenna;
   
-  // ========== 9. 腿部（从腹部下方伸出） ==========
+  // ========== 9. 腿部（3 对，围绕 3 段腹部分布，Q 版斜向下） ==========
   const legGeometry = new THREE.CapsuleGeometry(0.035, 0.2, 8, 8);
   const legMaterial = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 75 });
   
+  // 腿部 X 位置根据腹部大小调整：第一节最大，第三节最小
+  const legXPositions = [-0.65, -0.55, -0.48];
+  
   for (let i = 0; i < 3; i++) {
     const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    leftLeg.position.set(-0.55 - i * 0.08, -0.65 - i * 0.35, -0.1);
-    leftLeg.rotation.z = 0.5;
+    // 与腹部位置对齐（腹部 y = -0.7 - i * 0.5），Z=0 更容易看到
+    leftLeg.position.set(legXPositions[i], -0.7 - i * 0.5, 0);
+    // Q 版设计：腿斜向下
+    leftLeg.rotation.z = -0.3;
     leftLeg.rotation.x = -0.15;
     pet.add(leftLeg);
     petParts[`leftLeg${i}`] = leftLeg;
     
     const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-    rightLeg.position.set(0.55 + i * 0.08, -0.65 - i * 0.35, -0.1);
-    rightLeg.rotation.z = -0.5;
+    rightLeg.position.set(-legXPositions[i], -0.7 - i * 0.5, 0);
+    rightLeg.rotation.z = 0.3;
     rightLeg.rotation.x = -0.15;
     pet.add(rightLeg);
     petParts[`rightLeg${i}`] = rightLeg;
