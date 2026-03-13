@@ -8,9 +8,15 @@ import { EmotionState, EmotionTrigger, EXPRESSION_CONFIG } from './emotion-syste
 import { ParticleSystemManager } from './particle-system.js';
 import { InnerVoiceManager } from './inner-voice.js';
 
+// ==================== 导入新模块：GLB 模型加载 ====================
+import { ModelLoader } from './model-loader.js';
+import { AnimationController } from './animation-controller.js';
+
 // ==================== 全局变量 ====================
 let scene, camera, renderer, pet;
 let petParts = {};
+let animController = null; // ⭐ 新增：动画控制器
+let modelLoader = null;    // ⭐ 新增：模型加载器
 
 // 模块实例
 let colorRenderer = null;
@@ -26,8 +32,51 @@ let websocket = null;
 let isRotating = false;
 let rotateStartX = 0, rotateStartY = 0;
 
-// ==================== 创建哈基虾（Q 版萌化版） ====================
-function createPet() {
+// ==================== 加载 GLB 模型（替换手搓龙虾） ====================
+async function loadGLBModel() {
+  console.log('🦞 开始加载 GLB 模型：GrayWolf3dmodel.glb');
+  
+  modelLoader = new ModelLoader();
+  
+  try {
+    // 加载 GLB 文件
+    const gltf = await modelLoader.load('models/GrayWolf3dmodel.glb');
+    
+    // 设置模型属性
+    pet = modelLoader.setup(gltf, {
+      scale: 1.3,        // 根据实际大小调整
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 }
+    });
+    
+    scene.add(pet);
+    
+    // ⭐ 初始化动画控制器
+    animController = new AnimationController(gltf, pet);
+    
+    // 播放第一个可用动画（通常是 idle）
+    const animations = animController.getAvailableAnimations();
+    if (animations.length > 0) {
+      // 优先播放 idle 动画
+      if (animations.includes('idle')) {
+        animController.play('idle');
+      } else {
+        animController.play(animations[0]); // 播放第一个动画
+      }
+    }
+    
+    console.log('✅ GLB 模型加载成功！');
+    
+  } catch (error) {
+    console.error('❌ GLB 模型加载失败:', error);
+    console.log('📦 使用 Fallback：手搓龙虾模型');
+    // Fallback：使用原来的手搓龙虾
+    createPetFallback();
+  }
+}
+
+// ==================== 创建哈基虾（Q 版萌化版）- Fallback ====================
+function createPetFallback() {
   pet = new THREE.Group();
   
   const mainColor = 0xFF4444;  // 初始龙虾红
@@ -38,7 +87,6 @@ function createPet() {
   pet.position.y = 0;
   
   // ========== 1. 头胸部（中心）- 缩小一点 ==========
-  // 头胸部半径从 1.1 减小到 0.95，避免头太大
   const cephalothoraxGeometry = new THREE.SphereGeometry(0.95, 48, 48);
   cephalothoraxGeometry.scale(1.0, 0.85, 0.95);
   cephalothoraxGeometry.computeVertexNormals();
@@ -50,7 +98,6 @@ function createPet() {
   petParts.cephalothorax = cephalothorax;
   
   // ========== 2. 腹部（3 节，大小递减明显） ==========
-  // 上段最大 (0.65)，中段中等 (0.5)，下段最小 (0.35) - 递减趋势明显
   const abdomenSizes = [0.65, 0.5, 0.35];
   for (let i = 0; i < 3; i++) {
     const size = abdomenSizes[i];
@@ -61,7 +108,6 @@ function createPet() {
       color: mainColor, shininess: 85, specular: 0x444444 
     });
     const segment = new THREE.Mesh(segmentGeometry, segmentMaterial);
-    // 三节紧密连接，间隔根据大小调整
     segment.position.set(0, -0.65 - i * 0.45, -0.1);
     pet.add(segment);
     petParts[`abdomen${i}`] = segment;
@@ -86,12 +132,10 @@ function createPet() {
   petParts.tail = tail;
   
   // ========== 4. 眼睛（陷进头部，不突出） ==========
-  // 眼球半径进一步缩小，深陷进头胸部
   const eyeballGeometry = new THREE.SphereGeometry(0.13, 32, 32);
   const eyeballMaterial = new THREE.MeshPhongMaterial({ color: white, shininess: 100, specular: 0x555555 });
   
   const leftEyeball = new THREE.Mesh(eyeballGeometry, eyeballMaterial);
-  // 深陷进头胸部内部（Z 轴更靠里）
   leftEyeball.position.set(-0.42, 0.25, 0.72);
   pet.add(leftEyeball);
   petParts.leftEyeball = leftEyeball;
@@ -154,46 +198,38 @@ function createPet() {
   pet.add(mouth);
   petParts.mouth = mouth;
   
-  // ========== 7. 钳子（Q 版设计：110% 大小，手臂增长，手掌紧贴手臂） ==========
+  // ========== 7. 钳子 ==========
   const createClaw = (size, side) => {
     const clawGroup = new THREE.Group();
-    
-    // === 第一层：手臂（向下增长） ===
-    // 手臂长度 0.45，中心在原点，所以从 y=-0.225 到 y=+0.225
     const armGeometry = new THREE.CylinderGeometry(0.06 * size, 0.09 * size, 0.45 * size, 16);
     const armMaterial = new THREE.MeshPhongMaterial({ color: mainColor, shininess: 85, specular: 0x444444 });
     const arm = new THREE.Mesh(armGeometry, armMaterial);
-    arm.position.y = -0.15 * size;  // 手臂中心位置
+    arm.position.y = -0.15 * size;
     arm.position.x = side * 0.03 * size;
     arm.position.z = -0.03 * size;
     arm.rotation.z = side * 0.15;
     arm.rotation.x = 0.03;
     clawGroup.add(arm);
     
-    // === 第二层：手掌组（精确连接手臂末端） ===
     const palmGroup = new THREE.Group();
-    // 精确计算：手臂中心 y=-0.15，手臂半长 0.225，所以末端在 y=-0.375
-    palmGroup.position.y = -0.375 * size;  // 精确接手臂末端
+    palmGroup.position.y = -0.375 * size;
     palmGroup.position.x = side * 0.06 * size;
     palmGroup.position.z = 0.0 * size;
-    palmGroup.rotation.x = 0.05; // 向上微弯
+    palmGroup.rotation.x = 0.05;
     palmGroup.rotation.z = side * 0.05;
     clawGroup.add(palmGroup);
     
-    // 手掌（在手掌组内，紧密连接手臂）
     const palmGeometry = new THREE.SphereGeometry(0.11 * size, 20, 20);
     palmGeometry.scale(1, 1.0, 0.7);
     palmGeometry.computeVertexNormals();
     const palmMaterial = new THREE.MeshPhongMaterial({ color: mainColor, shininess: 85, specular: 0x444444 });
     const palm = new THREE.Mesh(palmGeometry, palmMaterial);
-    // 手掌紧密连接手臂末端（手掌半径 0.11，所以中心在 -0.11）
     palm.position.y = -0.11 * size;
     palmGroup.add(palm);
     
     return clawGroup;
   };
   
-  // 钳子大小 110%，位置深嵌入交界处
   const leftClaw = createClaw(1.1, -1);
   leftClaw.position.set(-0.55, -0.53, 0.36);
   leftClaw.rotation.z = 0.1;
@@ -208,7 +244,7 @@ function createPet() {
   pet.add(rightClaw);
   petParts.rightClaw = rightClaw;
   
-  // ========== 8. 触角（从头部上方伸出） ==========
+  // ========== 8. 触角 ==========
   const antennaGeometry = new THREE.CylinderGeometry(0.015, 0.025, 0.7, 12);
   const antennaMaterial = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 80 });
   
@@ -226,22 +262,16 @@ function createPet() {
   pet.add(rightAntenna);
   petParts.rightAntenna = rightAntenna;
   
-  // ========== 9. 腿部（3 对，紧贴腹部三段，Q 版斜向下） ==========
+  // ========== 9. 腿部 ==========
   const legGeometry = new THREE.CapsuleGeometry(0.035, 0.2, 8, 8);
   const legMaterial = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 75 });
   
-  // 腿部 X 位置根据腹部大小调整：上段最大，下段最小（紧贴腹部边缘）
-  // 腹部大小：[0.65, 0.5, 0.35] → 腿的 X 位置：[-0.62, -0.48, -0.34]
   const legXPositions = [-0.62, -0.48, -0.34];
-  
-  // 腿部 Y 位置与腹部中心对齐（腹部中心 y = -0.65 - i * 0.45）
   const legYPositions = [-0.65, -1.1, -1.55];
   
   for (let i = 0; i < 3; i++) {
     const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    // 紧贴腹部边缘，Z=-0.08 稍微靠后（紧贴腹部）
     leftLeg.position.set(legXPositions[i], legYPositions[i], -0.08);
-    // Q 版设计：腿斜向下
     leftLeg.rotation.z = -0.3;
     leftLeg.rotation.x = -0.1;
     pet.add(leftLeg);
@@ -257,7 +287,7 @@ function createPet() {
   
   scene.add(pet);
   
-  console.log('✅ 哈基虾创建完成！');
+  console.log('✅ 哈基虾 Fallback 创建完成！');
 }
 
 // ==================== 初始化所有模块 ====================
@@ -303,60 +333,52 @@ function initModules() {
 }
 
 // ==================== 鼠标控制 ====================
-let isLeftButtonDown = false; // 左键是否按下
-let isLeftDragging = false;   // 是否正在拖动
-let dragStartX = 0, dragStartY = 0; // 鼠标按下时的位置
-let windowStartX = 0, windowStartY = 0; // 窗口起始位置
+let isLeftButtonDown = false;
+let isLeftDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let windowStartX = 0, windowStartY = 0;
 let clickStartTime = 0;
-const LONG_CLICK_THRESHOLD = 200; // 200ms 以上算长按
-const DRAG_THRESHOLD = 3; // 3px 移动阈值
+const LONG_CLICK_THRESHOLD = 200;
+const DRAG_THRESHOLD = 3;
 
 function setupMouseControls() {
   const canvas = renderer.domElement;
   
-  // 左键按下 - 开始拖动或准备单击
   canvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0) { // 左键按下
+    if (e.button === 0) {
       isLeftButtonDown = true;
       clickStartTime = Date.now();
       dragStartX = e.clientX;
       dragStartY = e.clientY;
       isLeftDragging = false;
       
-      // 使用 screenX/screenY 获取窗口位置（同步，不会阻塞）
       windowStartX = window.screenX || 0;
       windowStartY = window.screenY || 0;
       
       console.log('🖱️ 左键按下，窗口起始位置:', windowStartX, windowStartY);
-    } else if (e.button === 2) { // 右键
+    } else if (e.button === 2) {
       rotateStartX = e.clientX;
       rotateStartY = e.clientY;
       isRotating = true;
     }
   });
   
-  // 左键移动 - 拖动窗口（使用绝对位置，更精准）
   canvas.addEventListener('mousemove', (e) => {
-    // 只有左键按下时才处理拖动
     if (isLeftButtonDown) {
-      // 计算鼠标相对于按下位置的偏移量
       const offsetX = e.clientX - dragStartX;
       const offsetY = e.clientY - dragStartY;
       
-      // 如果移动距离超过阈值，认为是拖动
       if (Math.abs(offsetX) > DRAG_THRESHOLD || Math.abs(offsetY) > DRAG_THRESHOLD) {
         if (!isLeftDragging) {
           isLeftDragging = true;
           console.log('🖱️ 开始拖动窗口，offset:', offsetX, offsetY);
         }
         
-        // 计算窗口的目标位置（绝对位置）
         const targetX = windowStartX + offsetX;
         const targetY = windowStartY + offsetY;
         
-        console.log('🚀 移动窗口到:', targetX, targetY, '(windowStart:', windowStartX, windowStartY, ')');
+        console.log('🚀 移动窗口到:', targetX, targetY);
         
-        // 使用绝对位置移动窗口（更精准）
         if (window.electronAPI && window.electronAPI.setWindowPosition) {
           window.electronAPI.setWindowPosition(targetX, targetY);
         }
@@ -371,14 +393,12 @@ function setupMouseControls() {
     }
   });
   
-  // 左键释放 - 判断是单击还是拖动
   canvas.addEventListener('mouseup', (e) => {
     if (e.button === 0) {
-      isLeftButtonDown = false; // 关键：释放左键
+      isLeftButtonDown = false;
       
       const clickDuration = Date.now() - clickStartTime;
       
-      // 如果不是拖动且是短按，生成话题
       if (!isLeftDragging && clickDuration < LONG_CLICK_THRESHOLD) {
         console.log('🖱️ 左键单击，生成话题...');
         if (topicGenerator) {
@@ -397,14 +417,12 @@ function setupMouseControls() {
     }
   });
   
-  // 鼠标离开画布 - 重置所有状态
   canvas.addEventListener('mouseleave', () => {
     isLeftButtonDown = false;
     isLeftDragging = false;
     isRotating = false;
   });
   
-  // 右键菜单
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     showContextMenu(e.clientX, e.clientY);
@@ -439,9 +457,8 @@ function handleMenuAction(action) {
       break;
     case 'rotate':
       if (pet) {
-        // 360° = 2π 弧度，每次转 0.3 弧度，需要约 21 次
         let count = 0;
-        const totalRotations = 21; // 21 × 0.3 = 6.3 弧度 ≈ 361°
+        const totalRotations = 21;
         const interval = setInterval(() => {
           pet.rotation.y += 0.3;
           if (++count >= totalRotations) {
@@ -455,18 +472,15 @@ function handleMenuAction(action) {
       showBubble(`状态：${colorRenderer.currentLevel}`, false);
       break;
     case 'openclaw':
-      // 打开最新生成的话题（如果有的话）
       if (topicGenerator) {
         const sessionKey = topicGenerator.getFullSessionKey();
         console.log('🚀 打开 OpenClaw，会话 Key:', sessionKey);
         
         if (window.electronAPI && window.electronAPI.openDesktopPetSession) {
-          // 使用系统默认浏览器打开
           window.electronAPI.openDesktopPetSession(sessionKey)
             .then(result => {
               if (result.success) {
                 console.log('✅ 已使用系统浏览器打开 OpenClaw 会话');
-                // 标记话题为已打开
                 topicGenerator.markAsOpened();
                 showBubble('在浏览器中打开对话～', true);
               } else {
@@ -551,12 +565,10 @@ function connectWebSocket() {
 function handleSystemStatus(data) {
   const { cpu, memory, gpu, performance_score, performance_level } = data;
   
-  // 使用颜色渲染器更新颜色
   if (colorRenderer && performance_level) {
     colorRenderer.updateColor(performance_level);
   }
   
-  // 更新状态指示器
   updateStatusIndicator(cpu, memory);
 }
 
@@ -581,7 +593,6 @@ function hideLoading() {
   if (loading) loading.style.display = 'none';
 }
 
-// 当前气泡自动隐藏定时器
 let bubbleHideTimer = null;
 
 function showBubble(message, autoHide = true) {
@@ -589,28 +600,23 @@ function showBubble(message, autoHide = true) {
   const text = document.getElementById('bubble-text');
   
   if (bubble && text) {
-    // 清除之前的定时器
     if (bubbleHideTimer) {
       clearTimeout(bubbleHideTimer);
       bubbleHideTimer = null;
     }
     
-    // 更新气泡内容
     text.textContent = message;
-    
-    // 显示气泡
     bubble.classList.remove('hidden');
     bubble.classList.add('visible');
     
     console.log('💬 气泡显示:', message.substring(0, 50));
     
-    // 自动隐藏
     if (autoHide) {
       bubbleHideTimer = setTimeout(() => {
         bubble.classList.remove('visible');
         bubble.classList.add('hidden');
         console.log('💬 气泡隐藏');
-      }, 8000); // 8 秒后隐藏
+      }, 8000);
     }
   } else {
     console.error('❌ 气泡元素未找到');
@@ -618,7 +624,7 @@ function showBubble(message, autoHide = true) {
 }
 
 // ==================== 初始化 ====================
-function init() {
+async function init() {
   console.log('🦞 哈基虾初始化...');
   
   scene = new THREE.Scene();
@@ -642,7 +648,9 @@ function init() {
   backLight.position.set(-3, 2, -3);
   scene.add(backLight);
   
-  createPet();
+  // ⭐ 新增：加载 GLB 模型（如果失败则使用 Fallback 手搓龙虾）
+  await loadGLBModel();
+  
   initModules();
   setupMouseControls();
   connectWebSocket();
@@ -665,33 +673,40 @@ function animate() {
   const time = Date.now() * 0.001;
   
   if (pet) {
-    // 漂浮动画
-    const floatSpeed = colorRenderer?.currentLevel === '夯爆了' ? 2.5 : 1;
-    const floatAmp = colorRenderer?.currentLevel === '夯爆了' ? 0.12 : 0.06;
-    pet.position.y = Math.sin(time * floatSpeed) * floatAmp;
-    
-    // 触角摆动（使用情绪系统）
-    if (petParts.leftAntenna) {
-      const speed = colorRenderer?.currentLevel === '夯爆了' ? 0.15 : 0.08;
-      petParts.leftAntenna.rotation.z = 0.3 + Math.sin(time * 2.5) * speed;
-    }
-    if (petParts.rightAntenna) {
-      const speed = colorRenderer?.currentLevel === '夯爆了' ? 0.15 : 0.08;
-      petParts.rightAntenna.rotation.z = -0.3 + Math.sin(time * 2.5) * speed;
+    // ⭐ 更新 GLB 动画（如果有）
+    if (animController) {
+      const delta = clock.getDelta();
+      animController.update(delta);
     }
     
-    // 钳子摆动
-    if (petParts.leftClaw) petParts.leftClaw.rotation.z = 0.4 + Math.sin(time * 1.8) * 0.08;
-    if (petParts.rightClaw) petParts.rightClaw.rotation.z = -0.4 + Math.sin(time * 1.8) * 0.08;
+    // Fallback：手搓龙虾的漂浮动画
+    if (!animController) {
+      const floatSpeed = colorRenderer?.currentLevel === '夯爆了' ? 2.5 : 1;
+      const floatAmp = colorRenderer?.currentLevel === '夯爆了' ? 0.12 : 0.06;
+      pet.position.y = Math.sin(time * floatSpeed) * floatAmp;
+      
+      if (petParts.leftAntenna) {
+        const speed = colorRenderer?.currentLevel === '夯爆了' ? 0.15 : 0.08;
+        petParts.leftAntenna.rotation.z = 0.3 + Math.sin(time * 2.5) * speed;
+      }
+      if (petParts.rightAntenna) {
+        const speed = colorRenderer?.currentLevel === '夯爆了' ? 0.15 : 0.08;
+        petParts.rightAntenna.rotation.z = -0.3 + Math.sin(time * 2.5) * speed;
+      }
+      
+      if (petParts.leftClaw) petParts.leftClaw.rotation.z = 0.4 + Math.sin(time * 1.8) * 0.08;
+      if (petParts.rightClaw) petParts.rightClaw.rotation.z = -0.4 + Math.sin(time * 1.8) * 0.08;
+      
+      if (petParts.tail) petParts.tail.rotation.x = Math.PI * 0.1 + Math.sin(time * 1.5) * 0.1;
+    }
     
-    // 尾巴摆动
-    if (petParts.tail) petParts.tail.rotation.x = Math.PI * 0.1 + Math.sin(time * 1.5) * 0.1;
-    
-    // 更新粒子系统
     if (particleManager) particleManager.update();
   }
   
   renderer.render(scene, camera);
 }
+
+// 时钟（用于动画）
+const clock = new THREE.Clock();
 
 init();
