@@ -6,7 +6,7 @@
 
 body {
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.3); /* 半透明黑色背景，方便看到窗口 */
+  background: transparent; /* 完全透明背景 */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   user-select: none;
   /* 移除 -webkit-app-region: drag，让整个窗口都可以交互 */
