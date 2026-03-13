@@ -106,6 +106,10 @@ function startElectron(config: ExtensionConfig) {
         PET_THEME: config.theme || 'default',
         PET_ALWAYS_ON_TOP: String(config.alwaysOnTop ?? true),
         PET_TRANSPARENT: String(config.transparent ?? true),
+        // 确保不传递任何会开启开发者工具的环境变量
+        ELECTRON_ENABLE_LOGGING: undefined,
+        ELECTRON_ENABLE_STACK_DUMPING: undefined,
+        DEBUG: undefined,
       },
     });
 

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setWindowPosition: (x, y) => {
     ipcRenderer.send('set-window-position', x, y);
   },
+  getWindowPosition: () => ipcRenderer.invoke('get-window-position'),
   
   // ========== OpenClaw 集成 ==========
   // 发送到 OpenClaw Gateway

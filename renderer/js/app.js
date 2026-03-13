@@ -282,8 +282,8 @@ function initModules() {
 // ==================== 鼠标控制 ====================
 let isLeftButtonDown = false; // 左键是否按下
 let isLeftDragging = false;   // 是否正在拖动
-let dragStartX = 0, dragStartY = 0;
-let lastMouseX = 0, lastMouseY = 0;
+let dragStartX = 0, dragStartY = 0; // 鼠标按下时的位置
+let windowStartX = 0, windowStartY = 0; // 窗口起始位置
 let clickStartTime = 0;
 const LONG_CLICK_THRESHOLD = 200; // 200ms 以上算长按
 const DRAG_THRESHOLD = 3; // 3px 移动阈值
@@ -298,10 +298,13 @@ function setupMouseControls() {
       clickStartTime = Date.now();
       dragStartX = e.clientX;
       dragStartY = e.clientY;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
       isLeftDragging = false;
-      console.log('🖱️ 左键按下');
+      
+      // 使用 screenX/screenY 获取窗口位置（同步，不会阻塞）
+      windowStartX = window.screenX || 0;
+      windowStartY = window.screenY || 0;
+      
+      console.log('🖱️ 左键按下，窗口起始位置:', windowStartX, windowStartY);
     } else if (e.button === 2) { // 右键
       rotateStartX = e.clientX;
       rotateStartY = e.clientY;
@@ -309,31 +312,31 @@ function setupMouseControls() {
     }
   });
   
-  // 左键移动 - 拖动窗口（使用 delta 移动，更可靠）
+  // 左键移动 - 拖动窗口（使用绝对位置，更精准）
   canvas.addEventListener('mousemove', (e) => {
     // 只有左键按下时才处理拖动
     if (isLeftButtonDown) {
-      const deltaX = e.clientX - lastMouseX;
-      const deltaY = e.clientY - lastMouseY;
-      
-      // 累计移动距离
-      const totalDeltaX = e.clientX - dragStartX;
-      const totalDeltaY = e.clientY - dragStartY;
+      // 计算鼠标相对于按下位置的偏移量
+      const offsetX = e.clientX - dragStartX;
+      const offsetY = e.clientY - dragStartY;
       
       // 如果移动距离超过阈值，认为是拖动
-      if (Math.abs(totalDeltaX) > DRAG_THRESHOLD || Math.abs(totalDeltaY) > DRAG_THRESHOLD) {
+      if (Math.abs(offsetX) > DRAG_THRESHOLD || Math.abs(offsetY) > DRAG_THRESHOLD) {
         if (!isLeftDragging) {
           isLeftDragging = true;
-          console.log('🖱️ 开始拖动窗口 (totalDelta:', totalDeltaX, totalDeltaY, ')');
+          console.log('🖱️ 开始拖动窗口，offset:', offsetX, offsetY);
         }
         
-        // 使用 delta 移动窗口（更可靠）
-        if (window.electronAPI && window.electronAPI.moveWindow) {
-          window.electronAPI.moveWindow(0, 0, deltaX, deltaY);
-        }
+        // 计算窗口的目标位置（绝对位置）
+        const targetX = windowStartX + offsetX;
+        const targetY = windowStartY + offsetY;
         
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
+        console.log('🚀 移动窗口到:', targetX, targetY, '(windowStart:', windowStartX, windowStartY, ')');
+        
+        // 使用绝对位置移动窗口（更精准）
+        if (window.electronAPI && window.electronAPI.setWindowPosition) {
+          window.electronAPI.setWindowPosition(targetX, targetY);
+        }
       }
     } else if (isRotating && pet) {
       const deltaX = (e.clientX - rotateStartX) * 0.008;
@@ -413,10 +416,15 @@ function handleMenuAction(action) {
       break;
     case 'rotate':
       if (pet) {
+        // 360° = 2π 弧度，每次转 0.3 弧度，需要约 21 次
         let count = 0;
+        const totalRotations = 21; // 21 × 0.3 = 6.3 弧度 ≈ 361°
         const interval = setInterval(() => {
           pet.rotation.y += 0.3;
-          if (++count >= 20) clearInterval(interval);
+          if (++count >= totalRotations) {
+            clearInterval(interval);
+            console.log('✅ 360° 旋转完成');
+          }
         }, 50);
       }
       break;

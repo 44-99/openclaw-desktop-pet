@@ -148,16 +148,18 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: false,      // 禁用开发者工具
+      acceleratorWorksWhenHidden: false,
     },
   });
   
-  // 开发模式打开开发者工具
-  mainWindow.webContents.openDevTools();
+  // 禁用开发者工具（生产模式）
+  // mainWindow.webContents.openDevTools();
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   
-  // 打开开发者工具（开发时）
-  mainWindow.webContents.openDevTools();
+  // 禁用开发者工具
+  // mainWindow.webContents.openDevTools();
 
   // 窗口关闭时
   mainWindow.on('closed', () => {
@@ -521,10 +523,24 @@ ipcMain.on('show-from-tray', () => {
   }
 });
 
-// 窗口拖拽 - 手动实现
+// 窗口拖拽 - 手动实现（delta 移动）
 ipcMain.on('move-window', (event, deltaX, deltaY) => {
+  if (!mainWindow) return;
   const bounds = mainWindow.getBounds();
   mainWindow.setPosition(bounds.x + deltaX, bounds.y + deltaY);
+});
+
+// 窗口拖拽 - 直接设置位置（用于鼠标拖动，更精准）
+ipcMain.on('set-window-position', (event, x, y) => {
+  if (!mainWindow) return;
+  mainWindow.setPosition(Math.round(x), Math.round(y));
+});
+
+// 获取窗口位置（用于拖动计算）
+ipcMain.handle('get-window-position', () => {
+  if (!mainWindow) return { x: 0, y: 0 };
+  const bounds = mainWindow.getBounds();
+  return { x: bounds.x, y: bounds.y };
 });
 
 // ========== OpenClaw 集成 ==========

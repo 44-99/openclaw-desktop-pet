@@ -136,6 +136,8 @@ function loadGatewayToken() {
 }
 
 function createWindow() {
+  console.log('🪟 创建窗口，配置：devTools=false, frame=false');
+  
   mainWindow = new BrowserWindow({
     width: 300,
     height: 400,
@@ -152,24 +154,55 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       devTools: false,      // 禁用开发者工具
+      // 禁用所有快捷键（包括开发者工具快捷键）
+      acceleratorWorksWhenHidden: false,
     },
   });
   
-  // 确保开发者工具不会打开
+  console.log('✅ 窗口创建完成，检查开发者工具状态...');
+  
+  // 立即检查（不等待）
+  if (mainWindow.webContents.isDevToolsOpened()) {
+    console.error('❌ 窗口刚创建就检测到开发者工具已打开，强制关闭！');
+    mainWindow.webContents.closeDevTools();
+  } else {
+    console.log('✅ 开发者工具未打开');
+  }
+  
+  // 强制禁用所有开发者工具快捷键
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    // 禁用 F12 和 Ctrl+Shift+I 打开开发者工具
-    if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+    const keyCombo = `${input.control ? 'Ctrl+' : ''}${input.shift ? 'Shift+' : ''}${input.alt ? 'Alt+' : ''}${input.meta ? 'Cmd+' : ''}${input.key}`;
+    
+    // 拦截所有开发者工具相关快捷键
+    if (input.key === 'F12' || keyCombo.includes('DevTools') || keyCombo.includes('Toggle')) {
+      console.log('⛔ 拦截开发者工具快捷键:', keyCombo);
       event.preventDefault();
+      return false;
     }
   });
 
   mainWindow.loadFile('renderer/index.html');
   
-  // 窗口加载完成后确保开发者工具关闭
+  // 窗口加载完成后立即关闭开发者工具（强制）
   mainWindow.webContents.on('did-finish-load', () => {
     if (mainWindow.webContents.isDevToolsOpened()) {
+      console.log('⚠️ 检测到开发者工具已打开，强制关闭...');
       mainWindow.webContents.closeDevTools();
     }
+  });
+  
+  // 持续监控：每 500ms 检查一次开发者工具状态
+  const devToolsCheckInterval = setInterval(() => {
+    if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
+      console.log('⚠️ 开发者工具被重新打开，强制关闭...');
+      mainWindow.webContents.closeDevTools();
+    }
+  }, 500);
+  
+  // 窗口关闭时清理定时器
+  mainWindow.on('closed', () => {
+    clearInterval(devToolsCheckInterval);
+    mainWindow = null;
   });
 
   // 窗口关闭时
@@ -403,6 +436,10 @@ function createTray() {
 app.whenReady().then(async () => {
   console.log('🚀 App ready, creating window...');
   
+  // 强制禁用开发者工具（应用级别）
+  app.commandLine.appendSwitch('disable-dev-tools');
+  console.log('✅ 已设置 disable-dev-tools 启动参数');
+  
   // 先加载网关 Token
   loadGatewayToken();
   
@@ -596,13 +633,27 @@ ipcMain.on('show-from-tray', () => {
 
 // 窗口拖拽 - 手动实现（通过 delta 移动）
 ipcMain.on('move-window', (event, deltaX, deltaY) => {
+  if (!mainWindow) return;
   const bounds = mainWindow.getBounds();
   mainWindow.setPosition(bounds.x + deltaX, bounds.y + deltaY);
 });
 
 // 窗口拖拽 - 直接设置位置（用于鼠标拖动）
 ipcMain.on('set-window-position', (event, x, y) => {
+  if (!mainWindow) {
+    console.error('❌ set-window-position: mainWindow 不存在');
+    return;
+  }
+  console.log('🚀 set-window-position:', x, y, '-> 当前窗口位置:', mainWindow.getBounds());
   mainWindow.setPosition(Math.round(x), Math.round(y));
+  console.log('✅ 设置后窗口位置:', mainWindow.getBounds());
+});
+
+// 获取窗口位置（用于拖动计算）
+ipcMain.handle('get-window-position', () => {
+  if (!mainWindow) return { x: 0, y: 0 };
+  const bounds = mainWindow.getBounds();
+  return { x: bounds.x, y: bounds.y };
 });
 
 // ========== OpenClaw 集成 ==========
