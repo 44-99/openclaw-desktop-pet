@@ -405,6 +405,8 @@ function setupMouseControls() {
           topicGenerator.generateTopic().then(topic => {
             if (topic) {
               console.log('✅ 生成话题:', topic);
+              // ⭐ 显示话题到气泡
+              showBubble(topic, true);
             }
           });
         }
