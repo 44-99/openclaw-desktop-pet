@@ -280,7 +280,8 @@ function initModules() {
 }
 
 // ==================== 鼠标控制 ====================
-let isLeftDragging = false;
+let isLeftButtonDown = false; // 左键是否按下
+let isLeftDragging = false;   // 是否正在拖动
 let dragStartX = 0, dragStartY = 0;
 let lastMouseX = 0, lastMouseY = 0;
 let clickStartTime = 0;
@@ -292,13 +293,15 @@ function setupMouseControls() {
   
   // 左键按下 - 开始拖动或准备单击
   canvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0) { // 左键
+    if (e.button === 0) { // 左键按下
+      isLeftButtonDown = true;
       clickStartTime = Date.now();
       dragStartX = e.clientX;
       dragStartY = e.clientY;
       lastMouseX = e.clientX;
       lastMouseY = e.clientY;
       isLeftDragging = false;
+      console.log('🖱️ 左键按下');
     } else if (e.button === 2) { // 右键
       rotateStartX = e.clientX;
       rotateStartY = e.clientY;
@@ -308,7 +311,8 @@ function setupMouseControls() {
   
   // 左键移动 - 拖动窗口（使用 delta 移动，更可靠）
   canvas.addEventListener('mousemove', (e) => {
-    if (e.button === 0) {
+    // 只有左键按下时才处理拖动
+    if (isLeftButtonDown) {
       const deltaX = e.clientX - lastMouseX;
       const deltaY = e.clientY - lastMouseY;
       
@@ -320,7 +324,7 @@ function setupMouseControls() {
       if (Math.abs(totalDeltaX) > DRAG_THRESHOLD || Math.abs(totalDeltaY) > DRAG_THRESHOLD) {
         if (!isLeftDragging) {
           isLeftDragging = true;
-          console.log('🖱️ 开始拖动窗口');
+          console.log('🖱️ 开始拖动窗口 (totalDelta:', totalDeltaX, totalDeltaY, ')');
         }
         
         // 使用 delta 移动窗口（更可靠）
@@ -344,6 +348,8 @@ function setupMouseControls() {
   // 左键释放 - 判断是单击还是拖动
   canvas.addEventListener('mouseup', (e) => {
     if (e.button === 0) {
+      isLeftButtonDown = false; // 关键：释放左键
+      
       const clickDuration = Date.now() - clickStartTime;
       
       // 如果不是拖动且是短按，生成话题
@@ -356,6 +362,8 @@ function setupMouseControls() {
             }
           });
         }
+      } else if (isLeftDragging) {
+        console.log('🖱️ 拖动结束');
       }
       isLeftDragging = false;
     } else if (e.button === 2) {
@@ -363,9 +371,11 @@ function setupMouseControls() {
     }
   });
   
+  // 鼠标离开画布 - 重置所有状态
   canvas.addEventListener('mouseleave', () => {
-    isRotating = false;
+    isLeftButtonDown = false;
     isLeftDragging = false;
+    isRotating = false;
   });
   
   // 右键菜单
