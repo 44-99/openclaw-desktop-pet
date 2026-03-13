@@ -144,23 +144,33 @@ function createWindow() {
     alwaysOnTop: true,      // 顶层显示
     skipTaskbar: false,     // 显示在任务栏（方便调试）
     resizable: true,        // 可缩放
-    hasShadow: true,        // 有阴影（更容易看到）
+    hasShadow: false,       // 无边框窗口不需要阴影
     x: 100,                 // 初始 X 位置
     y: 100,                 // 初始 Y 位置
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: false,      // 禁用开发者工具
     },
   });
   
-  // 开发模式打开开发者工具
-  // mainWindow.webContents.openDevTools();
+  // 确保开发者工具不会打开
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    // 禁用 F12 和 Ctrl+Shift+I 打开开发者工具
+    if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+      event.preventDefault();
+    }
+  });
 
   mainWindow.loadFile('renderer/index.html');
   
-  // 打开开发者工具（开发时）
-  // mainWindow.webContents.openDevTools();
+  // 窗口加载完成后确保开发者工具关闭
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+    }
+  });
 
   // 窗口关闭时
   mainWindow.on('closed', () => {

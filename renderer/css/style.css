@@ -28,26 +28,32 @@ body {
   cursor: grabbing;
 }
 
-/* 对话气泡 */
+/* 对话气泡 - 居中显示在哈基虾上方 */
 #speech-bubble {
   position: absolute;
-  top: 20px;
-  right: 60px;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
   background: white;
+  border: 2px solid #FF6666;
   border-radius: 20px;
   padding: 12px 16px;
-  max-width: 200px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  max-width: 240px;
+  box-shadow: 0 4px 16px rgba(255, 102, 102, 0.4);
   animation: bubble-appear 0.3s ease-out;
-  z-index: 1000;
-  pointer-events: none; /* 让气泡不阻挡点击 */
-  opacity: 1; /* 确保可见 */
+  z-index: 9999; /* 最高层级 */
+  pointer-events: none;
+  opacity: 1;
 }
 
 #speech-bubble.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease-out;
+  display: none !important; /* 完全隐藏，不占空间 */
+}
+
+#speech-bubble.visible {
+  display: block !important;
+  animation: bubble-appear 0.3s ease-out;
 }
 
 #bubble-text {

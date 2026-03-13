@@ -282,9 +282,10 @@ function initModules() {
 // ==================== 鼠标控制 ====================
 let isLeftDragging = false;
 let dragStartX = 0, dragStartY = 0;
-let windowStartX = 0, windowStartY = 0;
+let lastMouseX = 0, lastMouseY = 0;
 let clickStartTime = 0;
 const LONG_CLICK_THRESHOLD = 200; // 200ms 以上算长按
+const DRAG_THRESHOLD = 3; // 3px 移动阈值
 
 function setupMouseControls() {
   const canvas = renderer.domElement;
@@ -295,11 +296,9 @@ function setupMouseControls() {
       clickStartTime = Date.now();
       dragStartX = e.clientX;
       dragStartY = e.clientY;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
       isLeftDragging = false;
-      
-      // 获取窗口当前位置
-      windowStartX = window.screenX || 0;
-      windowStartY = window.screenY || 0;
     } else if (e.button === 2) { // 右键
       rotateStartX = e.clientX;
       rotateStartY = e.clientY;
@@ -307,24 +306,30 @@ function setupMouseControls() {
     }
   });
   
-  // 左键移动 - 拖动窗口
+  // 左键移动 - 拖动窗口（使用 delta 移动，更可靠）
   canvas.addEventListener('mousemove', (e) => {
     if (e.button === 0) {
-      const deltaX = e.clientX - dragStartX;
-      const deltaY = e.clientY - dragStartY;
+      const deltaX = e.clientX - lastMouseX;
+      const deltaY = e.clientY - lastMouseY;
       
-      // 如果移动距离超过阈值，认为是拖动而不是点击
-      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-        isLeftDragging = true;
-        
-        // 计算新窗口位置
-        const newX = windowStartX + deltaX;
-        const newY = windowStartY + deltaY;
-        
-        // 通过 Electron API 移动窗口
-        if (window.electronAPI && window.electronAPI.setWindowPosition) {
-          window.electronAPI.setWindowPosition(newX, newY);
+      // 累计移动距离
+      const totalDeltaX = e.clientX - dragStartX;
+      const totalDeltaY = e.clientY - dragStartY;
+      
+      // 如果移动距离超过阈值，认为是拖动
+      if (Math.abs(totalDeltaX) > DRAG_THRESHOLD || Math.abs(totalDeltaY) > DRAG_THRESHOLD) {
+        if (!isLeftDragging) {
+          isLeftDragging = true;
+          console.log('🖱️ 开始拖动窗口');
         }
+        
+        // 使用 delta 移动窗口（更可靠）
+        if (window.electronAPI && window.electronAPI.moveWindow) {
+          window.electronAPI.moveWindow(0, 0, deltaX, deltaY);
+        }
+        
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
       }
     } else if (isRotating && pet) {
       const deltaX = (e.clientX - rotateStartX) * 0.008;
@@ -415,18 +420,22 @@ function handleMenuAction(action) {
         console.log('🚀 打开 OpenClaw，会话 Key:', sessionKey);
         
         if (window.electronAPI && window.electronAPI.openDesktopPetSession) {
+          // 使用系统默认浏览器打开
           window.electronAPI.openDesktopPetSession(sessionKey)
             .then(result => {
               if (result.success) {
-                console.log('✅ 已打开 OpenClaw 会话');
+                console.log('✅ 已使用系统浏览器打开 OpenClaw 会话');
                 // 标记话题为已打开
                 topicGenerator.markAsOpened();
+                showBubble('在浏览器中打开对话～', true);
               } else {
                 console.error('❌ 打开会话失败:', result.error);
+                showBubble('打开失败：' + result.error, true);
               }
             })
             .catch(err => {
               console.error('❌ 打开会话错误:', err);
+              showBubble('打开出错：' + err.message, true);
             });
         }
       }
@@ -531,13 +540,39 @@ function hideLoading() {
   if (loading) loading.style.display = 'none';
 }
 
+// 当前气泡自动隐藏定时器
+let bubbleHideTimer = null;
+
 function showBubble(message, autoHide = true) {
   const bubble = document.getElementById('speech-bubble');
   const text = document.getElementById('bubble-text');
+  
   if (bubble && text) {
+    // 清除之前的定时器
+    if (bubbleHideTimer) {
+      clearTimeout(bubbleHideTimer);
+      bubbleHideTimer = null;
+    }
+    
+    // 更新气泡内容
     text.textContent = message;
+    
+    // 显示气泡
     bubble.classList.remove('hidden');
-    if (autoHide) setTimeout(() => bubble.classList.add('hidden'), 5000);
+    bubble.classList.add('visible');
+    
+    console.log('💬 气泡显示:', message.substring(0, 50));
+    
+    // 自动隐藏
+    if (autoHide) {
+      bubbleHideTimer = setTimeout(() => {
+        bubble.classList.remove('visible');
+        bubble.classList.add('hidden');
+        console.log('💬 气泡隐藏');
+      }, 8000); // 8 秒后隐藏
+    }
+  } else {
+    console.error('❌ 气泡元素未找到');
   }
 }
 
