@@ -342,6 +342,58 @@ class ShockwaveParticle {
   }
 }
 
+// ==================== 扩张光环 (脉冲特效) ====================
+class ExpansionRing {
+  constructor(scene, petPosition) {
+    this.scene = scene;
+    this.petPosition = petPosition;
+    this.clock = new THREE.Clock();
+    
+    this.init();
+  }
+  
+  init() {
+    const geometry = new THREE.TorusGeometry(0.5, 0.1, 16, 64);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,  // ⭐ 青色光环
+      transparent: true,
+      opacity: 1.0,
+      side: THREE.DoubleSide,
+    });
+    
+    this.ring = new THREE.Mesh(geometry, material);
+    this.ring.position.copy(this.petPosition);
+    this.ring.rotation.x = Math.PI / 2;
+    this.scene.add(this.ring);
+    
+    this.lifetime = 1500;
+    this.birthTime = Date.now();
+    this.baseScale = 1;
+  }
+  
+  update(delta) {
+    const age = Date.now() - this.birthTime;
+    const progress = age / this.lifetime;
+    
+    // ⭐ 光环扩张 + 上升 + 淡出
+    const scale = 1 + progress * 3;  // 扩张到 4 倍
+    this.ring.scale.set(scale, scale, scale);
+    this.ring.position.y = this.petPosition.y + progress * 2;  // 上升 2 单位
+    
+    const remaining = 1 - progress;
+    this.ring.material.opacity = remaining;
+    
+    if(age > this.lifetime) return false;
+    return true;
+  }
+  
+  dispose() {
+    this.scene.remove(this.ring);
+    this.ring.geometry.dispose();
+    this.ring.material.dispose();
+  }
+}
+
 // ==================== 呼吸光晕 (Idle 特效) ====================
 class AuraParticle {
   constructor(scene, petPosition, color = 0xff4444) {
@@ -354,7 +406,7 @@ class AuraParticle {
   }
   
   init() {
-    const geometry = new THREE.SphereGeometry(1.8, 32, 32);
+    const geometry = new THREE.SphereGeometry(2.2, 32, 32);  // ⭐ 增大光晕：1.8 → 2.2
     const material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
@@ -375,9 +427,12 @@ class AuraParticle {
         varying vec3 vNormal;
         varying vec3 vPosition;
         void main() {
-          float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-          float pulse = sin(time * 2.0) * 0.3 + 0.7;
-          gl_FragColor = vec4(color * pulse, intensity * 0.4);
+          // ⭐ 更强的 Fresnel 边缘光效果
+          float intensity = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+          // ⭐ 更明显的脉冲效果（0.5-1.0 范围）
+          float pulse = sin(time * 1.5) * 0.5 + 0.8;
+          // ⭐ 提高整体亮度：0.4 → 0.8
+          gl_FragColor = vec4(color * pulse, intensity * 0.8);
         }
       `,
       transparent: true,
@@ -438,7 +493,7 @@ class FloatingGlowParticle {
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
       
-      sizes[i] = Math.random() * 0.15 + 0.05;
+      sizes[i] = Math.random() * 0.2 + 0.1;  // ⭐ 增大粒子：0.15 → 0.2
       phases[i] = Math.random() * Math.PI * 2;
       speeds[i] = Math.random() * 0.5 + 0.5;
     }
@@ -450,10 +505,10 @@ class FloatingGlowParticle {
     geometry.setAttribute('speed', new THREE.BufferAttribute(speeds, 1));
     
     const material = new THREE.PointsMaterial({
-      size: 0.2,
+      size: 0.3,  // ⭐ 增大基础尺寸：0.2 → 0.3
       vertexColors: true,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.9,  // ⭐ 提高不透明度：0.6 → 0.9
       map: this.createGlowTexture(),
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -538,6 +593,11 @@ class ParticleSystemManagerEnhanced {
         this.activeParticles.push(new ShockwaveParticle(this.scene, petPosition));
         break;
         
+      case 'pulse':
+        // ⭐ 脉冲特效：扩张光环
+        this.activeParticles.push(new ExpansionRing(this.scene, petPosition));
+        break;
+        
       case 'idle':
         this.enableIdleEffects(petPosition);
         break;
@@ -588,13 +648,13 @@ class ParticleSystemManagerEnhanced {
   }
 }
 
-// 导出原有粒子类（向后兼容）
-export { HeartParticle, BubbleParticle, ConfettiParticle } from './particle-system.js';
+// ==================== 导出 ====================
 export {
   StarTrailParticle,
   RotationRing,
   TrailParticle,
   ShockwaveParticle,
+  ExpansionRing,  // ⭐ 新增导出
   AuraParticle,
   FloatingGlowParticle,
   ParticleSystemManagerEnhanced

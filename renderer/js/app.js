@@ -5,10 +5,9 @@ import * as THREE from 'three';
 import { TopicGenerator } from './topic-generator.js';
 import { ColorRenderer } from './color-renderer.js';
 import { EmotionState, EmotionTrigger, EXPRESSION_CONFIG } from './emotion-system.js';
-import { ParticleSystemManager } from './particle-system.js';
 import { InnerVoiceManager } from './inner-voice.js';
 
-// ==================== 导入新模块：GLB 模型加载 ====================
+// ==================== 导入 GLB 模型加载 ====================
 import { ModelLoader } from './model-loader.js';
 import { AnimationController } from './animation-controller.js';
 
@@ -37,13 +36,16 @@ let rotateStartX = 0, rotateStartY = 0;
 
 // ⭐ 定时动作系统
 let lastActionTime = 0;
-const ACTION_INTERVAL = 10000; // ⭐ 10 秒一次定时动作
+const ACTION_INTERVAL = 5000; // ⭐ 5 秒一次定时动作
 let isActionInProgress = false;
 
 // ⭐ 镜头浮动
 let cameraBaseZ = 5;
 let cameraFloatOffset = 0;
 let cameraFloatTime = 0;
+
+// ⭐ 模型包装器（用于旋转动作，避免被 GLB 动画覆盖）
+let petWrapper = null;
 
 // ==================== 加载 GLB 模型（替换手搓龙虾） ====================
 async function loadGLBModel() {
@@ -52,6 +54,9 @@ async function loadGLBModel() {
     // 加载 GLB 文件
     const gltf = await modelLoader.load('models/gray_wolf.glb');
     
+    // ⭐ 创建包装器 Group（用于旋转动作，避免被 GLB 动画覆盖）
+    petWrapper = new THREE.Group();
+    
     // 设置模型属性
     pet = modelLoader.setup(gltf, {
       scale: 2,        // 根据实际大小调整
@@ -59,9 +64,11 @@ async function loadGLBModel() {
       rotation: { x: 0, y: -Math.PI / 2, z: 0 }
     });
     
-    scene.add(pet);
+    // ⭐ 将 pet 添加到 wrapper 中
+    petWrapper.add(pet);
+    scene.add(petWrapper);
     
-    // ⭐ 初始化动画控制器
+    // ⭐ 初始化动画控制器（使用 pet 而不是 wrapper）
     animController = new AnimationController(gltf, pet);
     
     // 播放第一个可用动画（通常是 idle）
@@ -77,9 +84,9 @@ async function loadGLBModel() {
     
     console.log('✅ GLB 模型加载成功！');
     
-    // ⭐ 启用 Idle 特效
+    // ⭐ 启用 Idle 特效（使用 wrapper 的位置）
     if (particleManager) {
-      particleManager.triggerEffect('idle', pet.position);
+      particleManager.triggerEffect('idle', petWrapper.position);
     }
     
   } catch (error) {
@@ -300,13 +307,16 @@ function createPetFallback() {
     petParts[`rightLeg${i}`] = rightLeg;
   }
   
-  scene.add(pet);
+  // ⭐ Fallback 也使用 wrapper
+  petWrapper = new THREE.Group();
+  petWrapper.add(pet);
+  scene.add(petWrapper);
   
   console.log('✅ 哈基虾 Fallback 创建完成！');
   
   // ⭐ 启用 Idle 特效
   if (particleManager) {
-    particleManager.triggerEffect('idle', pet.position);
+    particleManager.triggerEffect('idle', petWrapper.position);
   }
 }
 
@@ -319,7 +329,7 @@ async function initModules() {
   emotionSystem = new EmotionState();
   new EmotionTrigger(emotionSystem, petParts);
   
-  // 3. 粒子系统（增强版）
+  // 3. 粒子系统
   particleManager = new ParticleSystemManagerEnhanced(scene);
   
   // 4. 内心戏管理器
@@ -499,11 +509,11 @@ function showContextMenu(x, y) {
     menu.style.top = y + 'px';
     menu.classList.remove('hidden');
     
-    // ⭐ 5 秒后自动关闭菜单
+    // ⭐ 3 秒后自动关闭菜单
     menuAutoHideTimer = setTimeout(() => {
       menu.classList.add('hidden');
-      console.log('⏰ 菜单自动关闭（5 秒无操作）');
-    }, 5000);
+      console.log('⏰ 菜单自动关闭（3 秒无操作）');
+    }, 3000);
     
     menu.querySelectorAll('.menu-item').forEach(item => {
       item.onclick = (e) => {
@@ -744,28 +754,31 @@ async function init() {
   console.log('✅ 完成！');
 }
 
+// ⭐ 临时禁用动画控制器的标志
+let disableAnimationUpdate = false;
+
 // ==================== 定时动作触发器 ====================
 function triggerScheduledAction() {
   if (!pet || isActionInProgress) return;
   
-  const actions = ['rotateCW', 'rotateCCW', 'jump'];
+  const actions = ['rotateCW', 'rotateCCW', 'jump', 'pulse'];
   const action = actions[Math.floor(Math.random() * actions.length)];
   
   console.log('⏰ 定时触发:', action, '✨');
   isActionInProgress = true;
   
-  // ⭐ 触发粒子特效
+  // ⭐ 触发粒子特效（使用 wrapper 的位置）
   if (particleManager) {
-    particleManager.triggerEffect(action, pet.position);
+    particleManager.triggerEffect(action, petWrapper ? petWrapper.position : pet.position);
   }
   
   switch(action) {
     case 'rotateCW':
-      // 顺时针旋转一圈
+      // ⭐ 顺时针旋转一圈（使用 setInterval，之前成功实现的方式）
       let cwCount = 0;
       const cwInterval = setInterval(() => {
-        pet.rotation.y += 0.15;
-        if (++cwCount >= 42) { // 42 * 0.15 ≈ 6.3 弧度 ≈ 360°
+        pet.rotation.y += 0.2;
+        if (++cwCount >= 32) {  // 32 * 0.2 ≈ 6.4 弧度 ≈ 360°
           clearInterval(cwInterval);
           isActionInProgress = false;
           console.log('✅ 顺时针旋转完成 + 星光轨迹特效');
@@ -774,11 +787,11 @@ function triggerScheduledAction() {
       break;
       
     case 'rotateCCW':
-      // 逆时针旋转一圈
+      // ⭐ 逆时针旋转一圈
       let ccwCount = 0;
       const ccwInterval = setInterval(() => {
-        pet.rotation.y -= 0.15;
-        if (++ccwCount >= 42) {
+        pet.rotation.y -= 0.2;
+        if (++ccwCount >= 32) {
           clearInterval(ccwInterval);
           isActionInProgress = false;
           console.log('✅ 逆时针旋转完成 + 星光轨迹特效');
@@ -787,17 +800,35 @@ function triggerScheduledAction() {
       break;
       
     case 'jump':
-      // 跳跃
+      // ⭐ 跳跃
       let jumpProgress = 0;
       const jumpInterval = setInterval(() => {
         jumpProgress += 0.05;
         if (jumpProgress <= Math.PI) {
-          pet.position.y = Math.sin(jumpProgress) * 0.3;
+          pet.position.y = Math.sin(jumpProgress) * 0.5;
         } else {
           clearInterval(jumpInterval);
           pet.position.y = 0;
           isActionInProgress = false;
           console.log('✅ 跳跃完成 + 拖尾粒子 + 冲击波特效');
+        }
+      }, 16);
+      break;
+      
+    case 'pulse':
+      // ⭐ 脉冲缩放动作
+      let pulseProgress = 0;
+      const initialScale = pet.scale.x;  // ⭐ 保存初始缩放（GLB 是 2）
+      const pulseInterval = setInterval(() => {
+        pulseProgress += 0.1;
+        if (pulseProgress <= Math.PI * 2) {
+          const scale = initialScale + Math.sin(pulseProgress) * 0.3;
+          pet.scale.set(scale, scale, scale);
+        } else {
+          clearInterval(pulseInterval);
+          pet.scale.set(initialScale, initialScale, initialScale);
+          isActionInProgress = false;
+          console.log('✅ 脉冲缩放完成 + 光环特效');
         }
       }, 16);
       break;
@@ -813,14 +844,12 @@ function animate() {
   const now = Date.now();
   
   if (pet) {
-    // ⭐ 定时触发动作（10 秒间隔）
     if (!isActionInProgress && now - lastActionTime > ACTION_INTERVAL) {
       triggerScheduledAction();
       lastActionTime = now;
     }
     
-    // ⭐ 更新 GLB 动画
-    if (animController) {
+    if (animController && !isActionInProgress) {
       animController.update(delta);
     }
     
@@ -847,8 +876,25 @@ function animate() {
     
     // ⭐ 镜头轻微浮动（静态时的呼吸感）
     cameraFloatTime += delta * 0.5;
-    cameraFloatOffset = Math.sin(cameraFloatTime) * 0.15;
+    cameraFloatOffset = Math.sin(cameraFloatTime) * 0.2;
     camera.position.z = cameraBaseZ + cameraFloatOffset;
+    
+    // ⭐ 增强呼吸动画：模型本身的缩放 + Y 轴浮动
+    if (!isActionInProgress) {
+      const breathSpeed = colorRenderer?.currentLevel === '夯爆了' ? 2.0 : 1.2;
+      const breathAmp = colorRenderer?.currentLevel === '夯爆了' ? 0.08 : 0.05;
+      const breathY = Math.sin(time * breathSpeed) * breathAmp;
+      const breathScale = 1 + Math.sin(time * breathSpeed) * 0.03;
+      
+      // Y 轴浮动
+      if (petWrapper) {
+        petWrapper.position.y = breathY;
+        petWrapper.scale.set(breathScale, breathScale, breathScale);
+      } else if (pet) {
+        pet.position.y = breathY;
+        pet.scale.set(breathScale, breathScale, breathScale);
+      }
+    }
     
     // ⭐ 更新粒子系统
     if (particleManager) particleManager.update(delta);

@@ -12,11 +12,11 @@ class SystemMonitor:
     # 性能等级名称（4 级）
     LEVEL_NAMES = ['空闲', '忙碌', '紧张', '夯爆了']
     
-    # 基准线（正常使用范围，用于调分）
-    CPU_BASE = 25      # CPU 空闲时约 5-15%，正常 25-45%
-    MEM_BASE = 35      # 内存空闲时约 25-45%
-    GPU_BASE = 15      # GPU 空闲时约 5-15%
-    TEMP_BASE = 45     # GPU 温度空闲时约 35-45°C
+    # 基准线（正常使用范围，用于调分）- 降低门槛，更容易触发"夯爆了"
+    CPU_BASE = 35      # CPU 空闲时约 5-15%，正常 25-45% → 提高基准，更容易扣分
+    MEM_BASE = 45      # 内存空闲时约 25-45% → 提高基准，更容易扣分
+    GPU_BASE = 20      # GPU 空闲时约 5-15% → 提高基准，更容易扣分
+    TEMP_BASE = 50     # GPU 温度空闲时约 35-45°C → 提高基准，更容易扣分
     
     def __init__(self):
         self.system = platform.system()
@@ -101,17 +101,37 @@ class SystemMonitor:
     def calculate_score(self, cpu, memory, gpu, gpu_temp):
         """
         计算性能综合评分（0-100）
-        使用学科调分，确保覆盖 0-100 大部分范围
+        木桶效应 + 短板惩罚：只要有两三个指标达到瓶颈，就直接判定为低分
         """
-        # 计算偏离度（超过基准线越多，分数越低）
-        cpu_score = max(0, 100 - (cpu - self.CPU_BASE) * 1.5)
-        mem_score = max(0, 100 - (memory - self.MEM_BASE) * 1.5)
-        gpu_score = max(0, 100 - (gpu - self.GPU_BASE) * 1.5)
-        temp_score = max(0, 100 - (gpu_temp - self.TEMP_BASE) * 2)
+        # 计算各指标的单项评分（越低越差）
+        cpu_score = max(0, 100 - (cpu - self.CPU_BASE) * 2.0)
+        mem_score = max(0, 100 - (memory - self.MEM_BASE) * 2.0)
+        gpu_score = max(0, 100 - (gpu - self.GPU_BASE) * 2.0)
+        temp_score = max(0, 100 - (gpu_temp - self.TEMP_BASE) * 2.5)
+        
+        # 统计"危险指标"数量（单项评分 < 40 表示该指标已接近瓶颈）
+        critical_count = sum(1 for s in [cpu_score, mem_score, gpu_score, temp_score] if s < 40)
+        
+        # 木桶效应：短板惩罚
+        # 如果有 2 个以上指标接近瓶颈，直接大幅扣分
+        if critical_count >= 3:
+            # 3-4 个指标瓶颈：直接判定为"夯爆了"
+            penalty = 50
+        elif critical_count == 2:
+            # 2 个指标瓶颈：中度惩罚
+            penalty = 25
+        elif critical_count == 1:
+            # 1 个指标瓶颈：轻度惩罚
+            penalty = 10
+        else:
+            penalty = 0
         
         # 加权平均（CPU 和内存权重更高）
-        score = (cpu_score * 0.35 + mem_score * 0.35 + 
-                 gpu_score * 0.15 + temp_score * 0.15)
+        base_score = (cpu_score * 0.35 + mem_score * 0.35 + 
+                      gpu_score * 0.15 + temp_score * 0.15)
+        
+        # 应用短板惩罚
+        score = base_score - penalty
         
         return max(0, min(100, score))
     
