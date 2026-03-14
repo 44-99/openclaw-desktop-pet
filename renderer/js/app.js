@@ -291,7 +291,7 @@ function createPetFallback() {
 }
 
 // ==================== 初始化所有模块 ====================
-function initModules() {
+async function initModules() {
   // 1. 颜色渲染器
   colorRenderer = new ColorRenderer(petParts);
   
@@ -314,20 +314,28 @@ function initModules() {
     }
   });
   
-  // 5. 话题生成器
-  topicGenerator = new TopicGenerator({
-    sendToOpenClaw: async (prompt, sessionKey) => {
-      if (window.electronAPI?.sendToOpenClaw) {
-        return await window.electronAPI.sendToOpenClaw(prompt, sessionKey);
-      }
-      return { success: false, error: 'IPC not available' };
-    },
-    showBubble: (message) => {
-      showBubble(message, true);
-    },
-    hasTavilyAPI: false,
-    memoryPath: ''
-  });
+  // 5. 话题生成器（异步初始化 Tavily API 状态）
+  const initTopicGenerator = async () => {
+    const hasTavilyAPI = await window.electronAPI?.hasTavilyAPIKey?.() || false;
+    
+    topicGenerator = new TopicGenerator({
+      sendToOpenClaw: async (prompt, sessionKey) => {
+        if (window.electronAPI?.sendToOpenClaw) {
+          return await window.electronAPI.sendToOpenClaw(prompt, sessionKey);
+        }
+        return { success: false, error: 'IPC not available' };
+      },
+      showBubble: (message) => {
+        showBubble(message, true);
+      },
+      hasTavilyAPI: hasTavilyAPI,
+      memoryPath: ''
+    });
+    
+    console.log('✅ 话题生成器初始化完成，Tavily API:', hasTavilyAPI ? '✅' : '❌');
+  };
+  
+  await initTopicGenerator();
   
   console.log('✅ 所有模块初始化完成！');
 }
@@ -653,7 +661,7 @@ async function init() {
   // ⭐ 新增：加载 GLB 模型（如果失败则使用 Fallback 手搓龙虾）
   await loadGLBModel();
   
-  initModules();
+  await initModules();
   setupMouseControls();
   connectWebSocket();
   

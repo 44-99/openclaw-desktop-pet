@@ -31,4 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // 打开桌面宠物会话（使用完整 sessionKey）
   openDesktopPetSession: (sessionKey) => ipcRenderer.invoke('open-desktop-pet-session', sessionKey),
+  
+  // 检查是否有 Tavily API Key
+  hasTavilyAPIKey: () => ipcRenderer.invoke('has-tavily-api-key'),
 });

@@ -615,13 +615,13 @@ ipcMain.handle('get-memory-files', async () => {
     // 读取 SOUL.md
     const soulPath = path.join(workspaceDir, 'SOUL.md');
     if (fs.existsSync(soulPath)) {
-      soul = fs.readFileSync(soulPath, 'utf8').substring(0, 500);
+      soul = fs.readFileSync(soulPath, 'utf8');
     }
     
     // 读取 MEMORY.md
     const memoryMdPath = path.join(memoryDir, '..', 'MEMORY.md');
     if (fs.existsSync(memoryMdPath)) {
-      memory = fs.readFileSync(memoryMdPath, 'utf8').substring(0, 500);
+      memory = fs.readFileSync(memoryMdPath, 'utf8');
     }
     
     // 读取今日笔记
@@ -632,13 +632,13 @@ ipcMain.handle('get-memory-files', async () => {
     // 读取 USER.md
     const userPath = path.join(workspaceDir, 'USER.md');
     if (fs.existsSync(userPath)) {
-      user = fs.readFileSync(userPath, 'utf8').substring(0, 500);
+      user = fs.readFileSync(userPath, 'utf8');
     }
     
     // 读取 IDENTITY.md
     const identityPath = path.join(workspaceDir, 'IDENTITY.md');
     if (fs.existsSync(identityPath)) {
-      identity = fs.readFileSync(identityPath, 'utf8').substring(0, 500);
+      identity = fs.readFileSync(identityPath, 'utf8');
     }
     
     return { soul, memory, today: todayNote, user, identity };
@@ -734,5 +734,31 @@ ipcMain.handle('open-desktop-pet-session', async (event, sessionKey) => {
   } catch (error) {
     console.error('❌ 打开会话失败:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// 检查是否有 Tavily API Key
+ipcMain.handle('has-tavily-api-key', async () => {
+  try {
+    const envPath = path.join(os.homedir(), '.openclaw', '.env');
+    let hasKey = false;
+    
+    // 检查 .env 文件是否存在
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf-8');
+      // 检查是否包含 TAVILY_API_KEY 且不为空
+      hasKey = /^TAVILY_API_KEY=.+$/m.test(envContent);
+    }
+    
+    // 也检查环境变量
+    if (!hasKey && process.env.TAVILY_API_KEY) {
+      hasKey = true;
+    }
+    
+    console.log('🔑 Tavily API Key 状态:', hasKey ? '✅ 有' : '❌ 无');
+    return hasKey;
+  } catch (error) {
+    console.error('❌ 检查 Tavily API Key 失败:', error);
+    return false;
   }
 });
