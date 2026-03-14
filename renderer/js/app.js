@@ -1,52 +1,41 @@
 // ==================== 导入 Three.js ====================
 import * as THREE from 'three';
-
 // ==================== 导入现有模块 ====================
 import { TopicGenerator } from './topic-generator.js';
 import { ColorRenderer } from './color-renderer.js';
 import { EmotionState, EmotionTrigger, EXPRESSION_CONFIG } from './emotion-system.js';
 import { InnerVoiceManager } from './inner-voice.js';
-
 // ==================== 导入 GLB 模型加载 ====================
 import { ModelLoader } from './model-loader.js';
 import { AnimationController } from './animation-controller.js';
-
 // ==================== 导入增强粒子系统 ====================
 import { ParticleSystemManagerEnhanced } from './particle-system-enhanced.js';
-
 // ==================== 全局变量 ====================
 let scene, camera, renderer, pet;
 let petParts = {};
-let animController = null; // ⭐ 新增：动画控制器
-let modelLoader = null;    // ⭐ 新增：模型加载器
-
+let animController = null; //
+let modelLoader = null;    //
 // 模块实例
 let colorRenderer = null;
 let emotionSystem = null;
 let particleManager = null;
 let innerVoiceManager = null;
 let topicGenerator = null;
-
 // WebSocket
 let websocket = null;
-
 // 鼠标控制
 let isRotating = false;
 let rotateStartX = 0, rotateStartY = 0;
-
-// ⭐ 定时动作系统
+//
 let lastActionTime = 0;
-const ACTION_INTERVAL = 5000; // ⭐ 5 秒一次定时动作
+const ACTION_INTERVAL = 15000; //
 let isActionInProgress = false;
-
-// ⭐ 镜头浮动
+//
 let cameraBaseZ = 5;
 let cameraFloatOffset = 0;
 let cameraFloatTime = 0;
-
-// ⭐ 模型包装器（用于旋转动作，避免被 GLB 动画覆盖）
+//
 let petWrapper = null;
-
 // ==================== 加载 GLB 模型（替换手搓龙虾） ====================
 async function loadGLBModel() {
   modelLoader = new ModelLoader();
@@ -54,7 +43,7 @@ async function loadGLBModel() {
     // 加载 GLB 文件
     const gltf = await modelLoader.load('models/gray_wolf.glb');
     
-    // ⭐ 创建包装器 Group（用于旋转动作，避免被 GLB 动画覆盖）
+    //
     petWrapper = new THREE.Group();
     
     // 设置模型属性
@@ -64,11 +53,11 @@ async function loadGLBModel() {
       rotation: { x: 0, y: -Math.PI / 2, z: 0 }
     });
     
-    // ⭐ 将 pet 添加到 wrapper 中
+    //
     petWrapper.add(pet);
     scene.add(petWrapper);
     
-    // ⭐ 初始化动画控制器（使用 pet 而不是 wrapper）
+    //
     animController = new AnimationController(gltf, pet);
     
     // 播放第一个可用动画（通常是 idle）
@@ -82,21 +71,20 @@ async function loadGLBModel() {
       }
     }
     
-    console.log('✅ GLB 模型加载成功！');
     
-    // ⭐ 启用 Idle 特效（使用 wrapper 的位置）
+    
+    //
     if (particleManager) {
       particleManager.triggerEffect('idle', petWrapper.position);
     }
     
   } catch (error) {
-    console.error('❌ GLB 模型加载失败:', error);
-    console.log('📦 使用 Fallback：手搓龙虾模型');
+    
+    
     // Fallback：使用原来的手搓龙虾
     createPetFallback();
   }
 }
-
 // ==================== 创建哈基虾（Q 版萌化版）- Fallback ====================
 function createPetFallback() {
   pet = new THREE.Group();
@@ -307,19 +295,18 @@ function createPetFallback() {
     petParts[`rightLeg${i}`] = rightLeg;
   }
   
-  // ⭐ Fallback 也使用 wrapper
+  //
   petWrapper = new THREE.Group();
   petWrapper.add(pet);
   scene.add(petWrapper);
   
-  console.log('✅ 哈基虾 Fallback 创建完成！');
   
-  // ⭐ 启用 Idle 特效
+  
+  //
   if (particleManager) {
     particleManager.triggerEffect('idle', petWrapper.position);
   }
 }
-
 // ==================== 初始化所有模块 ====================
 async function initModules() {
   // 1. 颜色渲染器
@@ -362,14 +349,13 @@ async function initModules() {
       memoryPath: ''
     });
     
-    console.log('✅ 话题生成器初始化完成，Tavily API:', hasTavilyAPI ? '✅' : '❌');
+    
   };
   
   await initTopicGenerator();
   
-  console.log('✅ 所有模块初始化完成！');
+  
 }
-
 // ==================== 鼠标控制 ====================
 let isLeftButtonDown = false;
 let isLeftDragging = false;
@@ -378,7 +364,6 @@ let windowStartX = 0, windowStartY = 0;
 let clickStartTime = 0;
 const LONG_CLICK_THRESHOLD = 200;
 const DRAG_THRESHOLD = 3;
-
 function setupMouseControls() {
   const canvas = renderer.domElement;
   
@@ -393,7 +378,7 @@ function setupMouseControls() {
       windowStartX = window.screenX || 0;
       windowStartY = window.screenY || 0;
       
-      console.log('🖱️ 左键按下，窗口起始位置:', windowStartX, windowStartY);
+      
     } else if (e.button === 2) {
       rotateStartX = e.clientX;
       rotateStartY = e.clientY;
@@ -409,13 +394,13 @@ function setupMouseControls() {
       if (Math.abs(offsetX) > DRAG_THRESHOLD || Math.abs(offsetY) > DRAG_THRESHOLD) {
         if (!isLeftDragging) {
           isLeftDragging = true;
-          console.log('🖱️ 开始拖动窗口，offset:', offsetX, offsetY);
+          
         }
         
         const targetX = windowStartX + offsetX;
         const targetY = windowStartY + offsetY;
         
-        console.log('🚀 移动窗口到:', targetX, targetY);
+        
         
         if (window.electronAPI && window.electronAPI.setWindowPosition) {
           window.electronAPI.setWindowPosition(targetX, targetY);
@@ -438,32 +423,32 @@ function setupMouseControls() {
       const clickDuration = Date.now() - clickStartTime;
       
       if (!isLeftDragging && clickDuration < LONG_CLICK_THRESHOLD) {
-        console.log('🖱️ 左键单击，生成话题...');
+        
         
         if (topicGenerator) {
-          // ⭐ 检查是否正在等待
+          //
           if (topicGenerator.isBusy()) {
             // 安抚用户（不自动隐藏，防止消失后用户更急）
             showBubble('别急嘛，正在努力思考中～🤔', false);
             return;
           }
           
-          // ⭐ 显示"思考中"提示（不自动隐藏，等结果出来）
+          //
           showBubble('让我想想哦～🤔', false);
           
           topicGenerator.generateTopic().then(topic => {
             if (topic) {
-              console.log('✅ 生成话题:', topic);
-              // ⭐ 显示实际话题（不自动隐藏，用于后续开启对话）
+              
+              //
               showBubble(topic, false);
             } else {
-              // ⭐ 生成失败：显示错误原因（8 秒后自动隐藏）
+              //
               showBubble('网络开小差了，再试一次吧～🌊', true);
             }
           });
         }
       } else if (isLeftDragging) {
-        console.log('🖱️ 拖动结束');
+        
       }
       isLeftDragging = false;
     } else if (e.button === 2) {
@@ -482,7 +467,7 @@ function setupMouseControls() {
     showContextMenu(e.clientX, e.clientY);
   });
   
-  // ⭐ 点击 canvas 时关闭菜单
+  //
   canvas.addEventListener('mousedown', () => {
     const menu = document.getElementById('context-menu');
     if (menu) {
@@ -494,13 +479,11 @@ function setupMouseControls() {
     }
   });
 }
-
-let menuAutoHideTimer = null;  // ⭐ 菜单自动关闭定时器
-
+let menuAutoHideTimer = null;  //
 function showContextMenu(x, y) {
   const menu = document.getElementById('context-menu');
   if (menu) {
-    // ⭐ 清除之前的定时器
+    //
     if (menuAutoHideTimer) {
       clearTimeout(menuAutoHideTimer);
     }
@@ -509,10 +492,10 @@ function showContextMenu(x, y) {
     menu.style.top = y + 'px';
     menu.classList.remove('hidden');
     
-    // ⭐ 3 秒后自动关闭菜单
+    //
     menuAutoHideTimer = setTimeout(() => {
       menu.classList.add('hidden');
-      console.log('⏰ 菜单自动关闭（3 秒无操作）');
+      
     }, 3000);
     
     menu.querySelectorAll('.menu-item').forEach(item => {
@@ -522,7 +505,7 @@ function showContextMenu(x, y) {
         if (action) handleMenuAction(action);
         menu.classList.add('hidden');
         
-        // ⭐ 点击菜单项时清除定时器
+        //
         if (menuAutoHideTimer) {
           clearTimeout(menuAutoHideTimer);
           menuAutoHideTimer = null;
@@ -531,9 +514,8 @@ function showContextMenu(x, y) {
     });
   }
 }
-
 function handleMenuAction(action) {
-  console.log('菜单动作:', action);
+  
   switch(action) {
     case 'talk':
       if (websocket?.readyState === WebSocket.OPEN) {
@@ -547,29 +529,29 @@ function handleMenuAction(action) {
     case 'openclaw':
       if (topicGenerator) {
         const sessionKey = topicGenerator.getFullSessionKey();
-        console.log('🚀 打开 OpenClaw，会话 Key:', sessionKey);
+        
         
         if (window.electronAPI && window.electronAPI.openDesktopPetSession) {
           window.electronAPI.openDesktopPetSession(sessionKey)
             .then(result => {
               if (result.success) {
-                console.log('✅ 已使用系统浏览器打开 OpenClaw 会话');
+                
                 topicGenerator.markAsOpened();
                 showBubble('在浏览器中打开对话～', true);
               } else {
-                console.error('❌ 打开会话失败:', result.error);
+                
                 showBubble('打开失败：' + result.error, true);
               }
             })
             .catch(err => {
-              console.error('❌ 打开会话错误:', err);
+              
               showBubble('打开出错：' + err.message, true);
             });
         }
       }
       break;
     case 'hide':
-      // ⭐ 调用 Electron API 隐藏窗口（和托盘一致）
+      //
       if (window.electronAPI?.hideWindow) {
         window.electronAPI.hideWindow();
       }
@@ -579,12 +561,10 @@ function handleMenuAction(action) {
       break;
   }
 }
-
 document.addEventListener('click', () => {
   const menu = document.getElementById('context-menu');
   if (menu) menu.classList.add('hidden');
 });
-
 // ==================== WebSocket 连接 ====================
 function connectWebSocket() {
   if (websocket) {
@@ -596,7 +576,7 @@ function connectWebSocket() {
   
   function tryConnect() {
     if (currentPortIndex >= ports.length) {
-      console.log('端口全满，使用模拟模式');
+      
       simulateSystemStatus();
       return;
     }
@@ -637,7 +617,6 @@ function connectWebSocket() {
   
   tryConnect();
 }
-
 function handleSystemStatus(data) {
   const { cpu, memory, gpu, performance_score, performance_level } = data;
   
@@ -647,7 +626,6 @@ function handleSystemStatus(data) {
   
   updateStatusIndicator(cpu, memory);
 }
-
 function simulateSystemStatus() {
   const levels = ['空闲', '忙碌', '紧张', '夯爆了'];
   setInterval(() => {
@@ -655,7 +633,6 @@ function simulateSystemStatus() {
     if (colorRenderer) colorRenderer.updateColor(level);
   }, 5000);
 }
-
 function updateStatusIndicator(cpu, memory) {
   const statusDot = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
@@ -663,14 +640,11 @@ function updateStatusIndicator(cpu, memory) {
   if (statusDot) statusDot.style.backgroundColor = colors[colorRenderer?.currentLevel] || '#B0C4DE';
   if (statusText) statusText.textContent = colorRenderer?.currentLevel || '空闲';
 }
-
 function hideLoading() {
   const loading = document.getElementById('loading');
   if (loading) loading.style.display = 'none';
 }
-
 let bubbleHideTimer = null;
-
 function showBubble(message, autoHide = true) {
   const bubble = document.getElementById('speech-bubble');
   const text = document.getElementById('bubble-text');
@@ -685,27 +659,26 @@ function showBubble(message, autoHide = true) {
     bubble.classList.remove('hidden');
     bubble.classList.add('visible');
     
-    console.log('💬 气泡显示:', message.substring(0, 50));
+    
     
     if (autoHide) {
       bubbleHideTimer = setTimeout(() => {
         bubble.classList.remove('visible');
         bubble.classList.add('hidden');
-        console.log('💬 气泡隐藏');
+        
       }, 8000);
     }
   } else {
-    console.error('❌ 气泡元素未找到');
+    
   }
 }
-
 // ==================== 初始化 ====================
 async function init() {
-  console.log('🦞 哈基虾初始化...');
+  
   
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 0.6, 5);  // ⭐ 相机 Y 轴：0.3 → 0.6（相机更上移，模型看起来更下移）
+  camera.position.set(0, 0.6, 5);  //
   
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -724,7 +697,7 @@ async function init() {
   backLight.position.set(-3, 2, -3);
   scene.add(backLight);
   
-  // ⭐ 新增：加载 GLB 模型（如果失败则使用 Fallback 手搓龙虾）
+  //
   await loadGLBModel();
   
   await initModules();
@@ -739,34 +712,30 @@ async function init() {
   
   animate();
   
-  console.log('✅ 完成！');
+  
 }
-
-// ⭐ 临时禁用动画控制器的标志
+//
 let disableAnimationUpdate = false;
-
 // ==================== 特效类型定义 ====================
-// ⭐ 6 种瞬时特效（全部已实现）
+//
 const EFFECT_TYPES = [
-  'star_trail',      // ⭐ 星光轨迹（旋转）
+  'star_trail',      //
   'rotation_ring',   // 💫 旋转光环
   'trail',           // 💨 拖尾粒子（跳跃）
   'shockwave',       // 🌊 冲击波（跳跃落地）
   'expansion_ring',  // 🔵 扩张光环（脉冲）
   'spark',           // ⚡ 电火花（抖动）- ✅ 新增
 ];
-
 // ==================== 动作与特效映射 ====================
-// ⭐ 每个动作配套 2-3 种特效，每次随机选择 1 种
+//
 const ACTION_EFFECT_MAP = {
   'wiggle': ['star_trail', 'expansion_ring'],           // 摇摆舞：星光/光环
   'bounce': ['trail', 'shockwave', 'expansion_ring'],   // 弹跳：拖尾/冲击波/光环
-  'shake': ['spark', 'expansion_ring', 'star_trail'],   // 抖动：电火花/光环/星光 ⭐
+  'shake': ['spark', 'expansion_ring', 'star_trail'],   // 抖动：电火花/光环/星光
   'stretch': ['expansion_ring', 'spark'],               // 拉伸：光环/电火花
   'spiral': ['star_trail', 'trail'],                    // 螺旋：星光/拖尾
   'jump': ['trail', 'shockwave', 'star_trail'],         // 跳跃：拖尾/冲击波/星光
 };
-
 // ==================== 触发动作对应的特效 ====================
 function triggerActionEffects(actionType, petPosition) {
   if (!particleManager) return;
@@ -774,42 +743,41 @@ function triggerActionEffects(actionType, petPosition) {
   // 获取该动作可用的特效列表
   const availableEffects = ACTION_EFFECT_MAP[actionType] || ['expansion_ring'];
   
-  // ⭐ 固定只选择 1 种特效（不再随机 1-2 个）
+  //
   const effectIndex = Math.floor(Math.random() * availableEffects.length);
   const selectedEffect = availableEffects[effectIndex];
   
   console.log(`✨ 动作 "${actionType}" 触发特效：${selectedEffect}`);
   
-  // ⭐ 将特效映射到现有的 triggerEffect 系统
+  //
   const effectMapping = {
     'star_trail': 'rotateCW',      // 复用星光轨迹 + 旋转光环
     'trail': 'jump',               // 复用拖尾粒子 + 冲击波
     'shockwave': 'jump',           // 复用拖尾粒子 + 冲击波
     'expansion_ring': 'pulse',     // 复用扩张光环
-    'spark': 'spark',              // ⭐ 新增：直接触发电火花
+    'spark': 'spark',              //
   };
   
   const mappedEffect = effectMapping[selectedEffect] || 'pulse';
   particleManager.triggerEffect(mappedEffect, petPosition);
 }
-
 // ==================== 定时动作触发器 ====================
 function triggerScheduledAction() {
   if (!pet || isActionInProgress) return;
   
-  // ⭐ 动作列表：包含跳跃
+  //
   const actions = ['wiggle', 'bounce', 'shake', 'stretch', 'spiral', 'jump'];
   const action = actions[Math.floor(Math.random() * actions.length)];
   
-  console.log('⏰ 定时触发:', action, '✨');
+  
   isActionInProgress = true;
   
-  // ⭐ 触发粒子特效（动作与特效解耦，随机搭配）
+  //
   triggerActionEffects(action, petWrapper ? petWrapper.position : pet.position);
   
   switch(action) {
     case 'wiggle':
-      // ⭐ 左右摇摆（像跳舞一样）- 时间加长
+      //
       let wiggleProgress = 0;
       const wiggleInterval = setInterval(() => {
         wiggleProgress += 0.1;  // 速度减慢，时间更长
@@ -825,13 +793,13 @@ function triggerScheduledAction() {
           if (petWrapper) petWrapper.rotation.z = 0;
           else pet.rotation.z = 0;
           isActionInProgress = false;
-          console.log('✅ 摇摆舞完成（加长版）');
+          
         }
       }, 16);
       break;
       
     case 'bounce':
-      // ⭐ 连续弹跳（像皮球一样）- 改为 7 次
+      //
       let bounceCount = 0;
       const bounceInterval = setInterval(() => {
         bounceCount++;
@@ -856,13 +824,13 @@ function triggerScheduledAction() {
           if (petWrapper) petWrapper.position.y = 0;
           else pet.position.y = 0;
           isActionInProgress = false;
-          console.log('✅ 连续弹跳完成（7 次）');
+          
         }
       }, 400);
       break;
       
     case 'shake':
-      // ⭐ 快速抖动（像兴奋/紧张一样）- 改为 20 次
+      //
       let shakeCount = 0;
       const shakeInterval = setInterval(() => {
         shakeCount++;
@@ -885,13 +853,13 @@ function triggerScheduledAction() {
             pet.rotation.y = 0;
           }
           isActionInProgress = false;
-          console.log('✅ 快速抖动完成（20 次）');
+          
         }
       }, 30);
       break;
       
     case 'stretch':
-      // ⭐ 拉伸挤压（像果冻一样）- 修复变形方向
+      //
       let stretchProgress = 0;
       const initialScale = pet.scale.x;
       const stretchInterval = setInterval(() => {
@@ -915,13 +883,13 @@ function triggerScheduledAction() {
             pet.scale.set(initialScale, initialScale, initialScale);
           }
           isActionInProgress = false;
-          console.log('✅ 拉伸挤压完成（修复方向）');
+          
         }
       }, 16);
       break;
       
     case 'spiral':
-      // ⭐ 螺旋上升（像龙卷风一样）- 1080° + 随机方向
+      //
       let spiralProgress = 0;
       // 随机方向：1 = 顺时针，-1 = 逆时针
       const direction = Math.random() > 0.5 ? 1 : -1;
@@ -955,7 +923,7 @@ function triggerScheduledAction() {
       break;
       
     case 'jump':
-      // ⭐ 跳跃（恢复原始版本）
+      //
       let jumpProgress = 0;
       const jumpInterval = setInterval(() => {
         jumpProgress += 0.05;
@@ -970,13 +938,12 @@ function triggerScheduledAction() {
           if (petWrapper) petWrapper.position.y = 0;
           else pet.position.y = 0;
           isActionInProgress = false;
-          console.log('✅ 跳跃完成');
+          
         }
       }, 16);
       break;
   }
 }
-
 // ==================== 渲染循环 ====================
 function animate() {
   requestAnimationFrame(animate);
@@ -1016,12 +983,12 @@ function animate() {
       if (petParts.tail) petParts.tail.rotation.x = Math.PI * 0.1 + Math.sin(time * 1.5) * 0.1;
     }
     
-    // ⭐ 镜头轻微浮动（静态时的呼吸感）
+    //
     cameraFloatTime += delta * 0.5;
     cameraFloatOffset = Math.sin(cameraFloatTime) * 0.2;
     camera.position.z = cameraBaseZ + cameraFloatOffset;
     
-    // ⭐ 增强呼吸动画：模型本身的缩放 + Y 轴浮动
+    //
     if (!isActionInProgress) {
       const breathSpeed = colorRenderer?.currentLevel === '夯爆了' ? 2.0 : 1.2;
       const breathAmp = colorRenderer?.currentLevel === '夯爆了' ? 0.08 : 0.05;
@@ -1038,14 +1005,12 @@ function animate() {
       }
     }
     
-    // ⭐ 更新粒子系统
+    //
     if (particleManager) particleManager.update(delta);
   }
   
   renderer.render(scene, camera);
 }
-
 // 时钟（用于动画）
 const clock = new THREE.Clock();
-
 init();

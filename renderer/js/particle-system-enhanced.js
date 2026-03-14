@@ -355,7 +355,7 @@ class ExpansionRing {
   init() {
     const geometry = new THREE.TorusGeometry(0.5, 0.1, 16, 64);
     const material = new THREE.MeshBasicMaterial({
-      color: 0x00ffff,  // ⭐ 青色光环
+      color: 0x00ffff,  //
       transparent: true,
       opacity: 1.0,
       side: THREE.DoubleSide,
@@ -375,7 +375,7 @@ class ExpansionRing {
     const age = Date.now() - this.birthTime;
     const progress = age / this.lifetime;
     
-    // ⭐ 光环扩张 + 上升 + 淡出
+    //
     const scale = 1 + progress * 3;  // 扩张到 4 倍
     this.ring.scale.set(scale, scale, scale);
     this.ring.position.y = this.petPosition.y + progress * 2;  // 上升 2 单位
@@ -552,7 +552,7 @@ class AuraParticle {
   }
   
   init() {
-    const geometry = new THREE.SphereGeometry(2.2, 32, 32);  // ⭐ 增大光晕：1.8 → 2.2
+    const geometry = new THREE.SphereGeometry(2.2, 32, 32);  //
     const material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
@@ -573,11 +573,11 @@ class AuraParticle {
         varying vec3 vNormal;
         varying vec3 vPosition;
         void main() {
-          // ⭐ 更强的 Fresnel 边缘光效果
+          //
           float intensity = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-          // ⭐ 更明显的脉冲效果（0.5-1.0 范围）
+          //
           float pulse = sin(time * 1.5) * 0.5 + 0.8;
-          // ⭐ 提高整体亮度：0.4 → 0.8
+          //
           gl_FragColor = vec4(color * pulse, intensity * 0.8);
         }
       `,
@@ -639,7 +639,7 @@ class FloatingGlowParticle {
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
       
-      sizes[i] = Math.random() * 0.2 + 0.1;  // ⭐ 增大粒子：0.15 → 0.2
+      sizes[i] = Math.random() * 0.2 + 0.1;  //
       phases[i] = Math.random() * Math.PI * 2;
       speeds[i] = Math.random() * 0.5 + 0.5;
     }
@@ -651,10 +651,10 @@ class FloatingGlowParticle {
     geometry.setAttribute('speed', new THREE.BufferAttribute(speeds, 1));
     
     const material = new THREE.PointsMaterial({
-      size: 0.3,  // ⭐ 增大基础尺寸：0.2 → 0.3
+      size: 0.3,  //
       vertexColors: true,
       transparent: true,
-      opacity: 0.9,  // ⭐ 提高不透明度：0.6 → 0.9
+      opacity: 0.9,  //
       map: this.createGlowTexture(),
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -740,12 +740,12 @@ class ParticleSystemManagerEnhanced {
         break;
         
       case 'pulse':
-        // ⭐ 脉冲特效：扩张光环
+        //
         this.activeParticles.push(new ExpansionRing(this.scene, petPosition));
         break;
         
       case 'spark':
-        // ⭐ 电火花特效
+        //
         this.activeParticles.push(new SparkParticle(this.scene, petPosition));
         break;
         
@@ -806,7 +806,7 @@ export {
   TrailParticle,
   ShockwaveParticle,
   ExpansionRing,
-  SparkParticle,  // ⭐ 新增：电火花
+  SparkParticle,  //
   AuraParticle,
   FloatingGlowParticle,
   ParticleSystemManagerEnhanced
