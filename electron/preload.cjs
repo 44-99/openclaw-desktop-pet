@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemStatus: () => ipcRenderer.invoke('get-system-status'),
   playSound: (soundType) => ipcRenderer.send('play-sound', soundType),
   toggleVisibility: () => ipcRenderer.send('toggle-visibility'),
+  hideWindow: () => ipcRenderer.send('hide-window'),  // ⭐ 新增：隐藏窗口
   quitApp: () => ipcRenderer.send('quit-app'),
   moveWindow: (screenX, screenY, deltaX, deltaY) => {
     ipcRenderer.send('move-window', deltaX, deltaY);

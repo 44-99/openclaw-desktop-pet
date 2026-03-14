@@ -46,7 +46,7 @@ async function loadGLBModel() {
     pet = modelLoader.setup(gltf, {
       scale: 1.3,        // 根据实际大小调整
       position: { x: 0, y: 0, z: 0 },
-      rotation: { x: 0, y: 0, z: 0 }
+      rotation: { x: 0, y: -Math.PI / 2, z: 0 }
     });
     
     scene.add(pet);
@@ -551,7 +551,10 @@ function handleMenuAction(action) {
       }
       break;
     case 'hide':
-      if (renderer?.domElement) renderer.domElement.style.display = 'none';
+      // ⭐ 调用 Electron API 隐藏窗口（和托盘一致）
+      if (window.electronAPI?.hideWindow) {
+        window.electronAPI.hideWindow();
+      }
       break;
     case 'quit':
       if (window.electronAPI?.quitApp) window.electronAPI.quitApp();

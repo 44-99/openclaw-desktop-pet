@@ -225,7 +225,7 @@ function createTray() {
   
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '显示哈基虾',
+      label: '显示',
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -234,7 +234,7 @@ function createTray() {
       }
     },
     {
-      label: '隐藏哈基虾',
+      label: '隐藏',
       click: () => {
         if (mainWindow) {
           mainWindow.hide();
@@ -242,7 +242,7 @@ function createTray() {
       }
     },
     {
-      label: '重启哈基虾',
+      label: '重启',
       click: () => {
         if (mainWindow) {
           mainWindow.reload();
@@ -406,6 +406,13 @@ ipcMain.on('toggle-visibility', () => {
     mainWindow.hide();
   } else {
     mainWindow.show();
+  }
+});
+
+// 隐藏窗口（和托盘菜单一致）
+ipcMain.on('hide-window', () => {
+  if (mainWindow) {
+    mainWindow.hide();
   }
 });
 
