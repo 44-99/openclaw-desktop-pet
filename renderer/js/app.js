@@ -746,24 +746,25 @@ async function init() {
 let disableAnimationUpdate = false;
 
 // ==================== 特效类型定义 ====================
-// ⭐ 只保留实际可用的瞬时特效（删除未实现的 spark 和持续性的 floating_glow/aura）
+// ⭐ 6 种瞬时特效（全部已实现）
 const EFFECT_TYPES = [
-  'star_trail',      // 星光轨迹（旋转）- ✅ 已实现
-  'rotation_ring',   // 旋转光环 - ✅ 已实现
-  'trail',           // 拖尾粒子（跳跃）- ✅ 已实现
-  'shockwave',       // 冲击波（跳跃落地）- ✅ 已实现
-  'expansion_ring',  // 扩张光环（脉冲）- ✅ 已实现
+  'star_trail',      // ⭐ 星光轨迹（旋转）
+  'rotation_ring',   // 💫 旋转光环
+  'trail',           // 💨 拖尾粒子（跳跃）
+  'shockwave',       // 🌊 冲击波（跳跃落地）
+  'expansion_ring',  // 🔵 扩张光环（脉冲）
+  'spark',           // ⚡ 电火花（抖动）- ✅ 新增
 ];
 
 // ==================== 动作与特效映射 ====================
-// ⭐ 删除未实现的 spark 和持续性的 floating_glow/aura，只保留实际可用的特效
+// ⭐ 每个动作配套 2-3 种特效，每次随机选择 1 种
 const ACTION_EFFECT_MAP = {
-  'wiggle': ['star_trail', 'expansion_ring'],                // 摇摆舞：星光/光环
-  'bounce': ['trail', 'shockwave', 'expansion_ring'],        // 弹跳：拖尾/冲击波/光环
-  'shake': ['expansion_ring', 'star_trail'],                 // 抖动：光环/星光
-  'stretch': ['expansion_ring'],                             // 拉伸：光环
-  'spiral': ['star_trail', 'trail'],                         // 螺旋：星光/拖尾
-  'jump': ['trail', 'shockwave', 'star_trail'],              // 跳跃：拖尾/冲击波/星光
+  'wiggle': ['star_trail', 'expansion_ring'],           // 摇摆舞：星光/光环
+  'bounce': ['trail', 'shockwave', 'expansion_ring'],   // 弹跳：拖尾/冲击波/光环
+  'shake': ['spark', 'expansion_ring', 'star_trail'],   // 抖动：电火花/光环/星光 ⭐
+  'stretch': ['expansion_ring', 'spark'],               // 拉伸：光环/电火花
+  'spiral': ['star_trail', 'trail'],                    // 螺旋：星光/拖尾
+  'jump': ['trail', 'shockwave', 'star_trail'],         // 跳跃：拖尾/冲击波/星光
 };
 
 // ==================== 触发动作对应的特效 ====================
@@ -773,42 +774,23 @@ function triggerActionEffects(actionType, petPosition) {
   // 获取该动作可用的特效列表
   const availableEffects = ACTION_EFFECT_MAP[actionType] || ['expansion_ring'];
   
-  // 随机选择 1-2 个特效
-  const effectCount = Math.random() > 0.6 ? 2 : 1;  // 40% 概率触发 2 个特效
-  const selectedEffects = [];
+  // ⭐ 固定只选择 1 种特效（不再随机 1-2 个）
+  const effectIndex = Math.floor(Math.random() * availableEffects.length);
+  const selectedEffect = availableEffects[effectIndex];
   
-  for (let i = 0; i < effectCount && availableEffects.length > 0; i++) {
-    const effectIndex = Math.floor(Math.random() * availableEffects.length);
-    const effect = availableEffects.splice(effectIndex, 1)[0];
-    selectedEffects.push(effect);
-  }
-  
-  console.log(`✨ 动作 "${actionType}" 触发特效：${selectedEffects.join(', ')}`);
+  console.log(`✨ 动作 "${actionType}" 触发特效：${selectedEffect}`);
   
   // ⭐ 将特效映射到现有的 triggerEffect 系统
   const effectMapping = {
     'star_trail': 'rotateCW',      // 复用星光轨迹 + 旋转光环
-    'trail': 'jump',               // 复用拖尾粒子
-    'shockwave': 'jump',           // 复用冲击波
+    'trail': 'jump',               // 复用拖尾粒子 + 冲击波
+    'shockwave': 'jump',           // 复用拖尾粒子 + 冲击波
     'expansion_ring': 'pulse',     // 复用扩张光环
+    'spark': 'spark',              // ⭐ 新增：直接触发电火花
   };
   
-  // 触发主要特效
-  const primaryEffect = selectedEffects[0];
-  const mappedEffect = effectMapping[primaryEffect] || 'pulse';
+  const mappedEffect = effectMapping[selectedEffect] || 'pulse';
   particleManager.triggerEffect(mappedEffect, petPosition);
-  
-  // ⭐ 如果有第二个特效，也触发（叠加效果）
-  if (selectedEffects.length > 1) {
-    const secondaryEffect = selectedEffects[1];
-    const secondaryMapped = effectMapping[secondaryEffect] || 'pulse';
-    // 延迟一点触发，避免完全重叠
-    setTimeout(() => {
-      if (petWrapper || pet) {
-        particleManager.triggerEffect(secondaryMapped, petWrapper ? petWrapper.position : pet.position);
-      }
-    }, 200);
-  }
 }
 
 // ==================== 定时动作触发器 ====================

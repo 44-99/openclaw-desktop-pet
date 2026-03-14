@@ -394,6 +394,152 @@ class ExpansionRing {
   }
 }
 
+// ==================== 电火花 (抖动特效) ====================
+class SparkParticle {
+  constructor(scene, petPosition) {
+    this.scene = scene;
+    this.petPosition = petPosition;
+    this.particleCount = 50;  // 50 个电火花粒子
+    this.clock = new THREE.Clock();
+    
+    this.init();
+  }
+  
+  init() {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(this.particleCount * 3);
+    const velocities = new Float32Array(this.particleCount * 3);
+    const colors = new Float32Array(this.particleCount * 3);
+    const sizes = new Float32Array(this.particleCount);
+    const lifetimes = new Float32Array(this.particleCount);
+    
+    // 电火花颜色：青色 + 白色 + 淡黄色
+    const sparkColors = [
+      new THREE.Color(0x00ffff), // 青色
+      new THREE.Color(0xffffff), // 白色
+      new THREE.Color(0xffffe0), // 淡黄
+    ];
+    
+    for(let i = 0; i < this.particleCount; i++) {
+      // 从宠物位置向四周喷射
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * 0.5;
+      
+      positions[i * 3] = this.petPosition.x + Math.cos(angle) * radius;
+      positions[i * 3 + 1] = this.petPosition.y + (Math.random() - 0.5) * 0.8;
+      positions[i * 3 + 2] = this.petPosition.z + Math.sin(angle) * radius;
+      
+      // 速度：向外扩散
+      const speed = 0.02 + Math.random() * 0.03;
+      velocities[i * 3] = (Math.random() - 0.5) * speed * 2;
+      velocities[i * 3 + 1] = (Math.random() - 0.5) * speed * 2;
+      velocities[i * 3 + 2] = (Math.random() - 0.5) * speed * 2;
+      
+      const color = sparkColors[Math.floor(Math.random() * sparkColors.length)];
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+      
+      sizes[i] = Math.random() * 0.15 + 0.08;
+      lifetimes[i] = 300 + Math.random() * 400;  // 300-700ms 寿命
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute('lifetime', new THREE.BufferAttribute(lifetimes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 0.25,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1.0,
+      map: this.createSparkTexture(),
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    
+    this.particleSystem = new THREE.Points(geometry, material);
+    this.scene.add(this.particleSystem);
+    
+    this.velocities = velocities;
+    this.birthTime = Date.now();
+    this.initialPositions = positions.slice();
+  }
+  
+  createSparkTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    // 创建星形火花纹理
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.3, 'rgba(200, 255, 255, 0.6)');
+    gradient.addColorStop(1, 'rgba(200, 255, 255, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(32, 32, 32, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 添加十字星芒效果
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(32, 8);
+    ctx.lineTo(32, 56);
+    ctx.moveTo(8, 32);
+    ctx.lineTo(56, 32);
+    ctx.stroke();
+    
+    return new THREE.CanvasTexture(canvas);
+  }
+  
+  update(delta) {
+    const positions = this.particleSystem.geometry.attributes.position.array;
+    const sizes = this.particleSystem.geometry.attributes.size.array;
+    const lifetimes = this.particleSystem.geometry.attributes.lifetime.array;
+    
+    const age = Date.now() - this.birthTime;
+    
+    for(let i = 0; i < this.particleCount; i++) {
+      // 更新位置
+      positions[i * 3] += this.velocities[i * 3];
+      positions[i * 3 + 1] += this.velocities[i * 3 + 1];
+      positions[i * 3 + 2] += this.velocities[i * 3 + 2];
+      
+      // 高频闪烁：根据时间和粒子索引
+      const flicker = Math.sin(age * 0.05 + i) * 0.5 + 0.5;
+      sizes[i] = (Math.random() * 0.15 + 0.08) * flicker;
+      
+      // 根据寿命淡出
+      const particleAge = age / lifetimes[i];
+      if (particleAge > 1) {
+        sizes[i] = 0;
+      }
+    }
+    
+    this.particleSystem.geometry.attributes.position.needsUpdate = true;
+    this.particleSystem.geometry.attributes.size.needsUpdate = true;
+    
+    // 所有粒子都消失时返回 false
+    if(age > 700) return false;
+    
+    const remaining = 1 - (age / 700);
+    this.particleSystem.material.opacity = remaining;
+    
+    return true;
+  }
+  
+  dispose() {
+    this.scene.remove(this.particleSystem);
+    this.particleSystem.geometry.dispose();
+    this.particleSystem.material.dispose();
+  }
+}
+
 // ==================== 呼吸光晕 (Idle 特效) ====================
 class AuraParticle {
   constructor(scene, petPosition, color = 0xff4444) {
@@ -598,6 +744,11 @@ class ParticleSystemManagerEnhanced {
         this.activeParticles.push(new ExpansionRing(this.scene, petPosition));
         break;
         
+      case 'spark':
+        // ⭐ 电火花特效
+        this.activeParticles.push(new SparkParticle(this.scene, petPosition));
+        break;
+        
       case 'idle':
         this.enableIdleEffects(petPosition);
         break;
@@ -654,7 +805,8 @@ export {
   RotationRing,
   TrailParticle,
   ShockwaveParticle,
-  ExpansionRing,  // ⭐ 新增导出
+  ExpansionRing,
+  SparkParticle,  // ⭐ 新增：电火花
   AuraParticle,
   FloatingGlowParticle,
   ParticleSystemManagerEnhanced
