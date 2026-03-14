@@ -135,7 +135,7 @@ function loadGatewayToken() {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 300,
-    height: 400,
+    height: 300,            // ⭐ 窗口高度：400 → 300px
     transparent: true,      // 透明背景
     frame: false,           // 无边框
     alwaysOnTop: true,      // 顶层显示

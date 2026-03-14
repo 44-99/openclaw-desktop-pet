@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLB 模型检查工具 - 哈基虾</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+    }
+    
+    h1 {
+      margin-bottom: 20px;
+      color: #FF6666;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .drop-zone {
+      border: 3px dashed #FF6666;
+      border-radius: 10px;
+      padding: 40px;
+      text-align: center;
+      margin-bottom: 20px;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      background: rgba(255, 102, 102, 0.1);
+      border-color: #FF8888;
+    }
+    
+    .drop-zone p {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    
+    .drop-zone small {
+      color: #888;
+    }
+    
+    #file-input {
+      display: none;
+    }
+    
+    .btn {
+      background: #FF6666;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    
+    .btn:hover {
+      background: #FF8888;
+    }
+    
+    .info-panel {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    
+    .info-item {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 5px;
+    }
+    
+    .info-item label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 5px;
+    }
+    
+    .info-item .value {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .section {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .section h2 {
+      color: #FF6666;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #FF6666;
+      padding-bottom: 10px;
+    }
+    
+    .material-card {
+      background: rgba(255, 255, 255, 0.08);
+      border-left: 4px solid #FF6666;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+    }
+    
+    .material-card h3 {
+      color: #FF8888;
+      margin-bottom: 10px;
+    }
+    
+    .texture-badge {
+      display: inline-block;
+      background: #4CAF50;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      margin: 2px;
+    }
+    
+    .texture-badge.missing {
+      background: #f44336;
+    }
+    
+    .log-output {
+      background: #000;
+      border: 1px solid #333;
+      border-radius: 5px;
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    
+    .log-success { color: #4CAF50; }
+    .log-error { color: #f44336; }
+    .log-warning { color: #ff9800; }
+    .log-info { color: #2196F3; }
+    
+    #canvas-container {
+      width: 100%;
+      height: 400px;
+      background: #000;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🦞 GLB 模型检查工具</h1>
+    
+    <!-- 文件上传区域 -->
+    <div class="drop-zone" id="drop-zone">
+      <p>📁 拖拽 GLB 文件到此处</p>
+      <small>或点击选择文件</small>
+      <br>
+      <button class="btn" onclick="document.getElementById('file-input').click()">选择文件</button>
+      <input type="file" id="file-input" accept=".glb,.gltf">
+    </div>
+    
+    <!-- 基础信息面板 -->
+    <div class="info-panel" id="info-panel" style="display: none;">
+      <h2>📊 基础信息</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <label>文件名</label>
+          <div class="value" id="file-name">-</div>
+        </div>
+        <div class="info-item">
+          <label>文件大小</label>
+          <div class="value" id="file-size">-</div>
+        </div>
+        <div class="info-item">
+          <label>场景数</label>
+          <div class="value" id="scene-count">-</div>
+        </div>
+        <div class="info-item">
+          <label>网格数</label>
+          <div class="value" id="mesh-count">-</div>
+        </div>
+        <div class="info-item">
+          <label>材质数</label>
+          <div class="value" id="material-count">-</div>
+        </div>
+        <div class="info-item">
+          <label>纹理数</label>
+          <div class="value" id="texture-count">-</div>
+        </div>
+        <div class="info-item">
+          <label>图像数</label>
+          <div class="value" id="image-count">-</div>
+        </div>
+        <div class="info-item">
+          <label>动画数</label>
+          <div class="value" id="animation-count">-</div>
+        </div>
+        <div class="info-item">
+          <label>骨骼数</label>
+          <div class="value" id="bone-count">-</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 材质详情 -->
+    <div class="section" id="materials-section" style="display: none;">
+      <h2>🎨 材质详情</h2>
+      <div id="materials-list"></div>
+    </div>
+    
+    <!-- 3D 预览 -->
+    <div id="canvas-container"></div>
+    
+    <!-- 控制台输出 -->
+    <div class="section">
+      <h2>📝 调试日志</h2>
+      <div class="log-output" id="log-output"></div>
+    </div>
+  </div>
+  
+  <!-- Three.js (使用 CDN) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    
+    let scene, camera, renderer;
+    
+    // 初始化 3D 场景
+    function init3D() {
+      const container = document.getElementById('canvas-container');
+      
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a2e);
+      
+      camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(3, 2, 3);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+      
+      // 灯光
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 5, 5);
+      scene.add(directionalLight);
+      
+      // 轨道控制（简化版）
+      let isDragging = false;
+      let previousMousePosition = { x: 0, y: 0 };
+      
+      renderer.domElement.addEventListener('mousedown', (e) => {
+        isDragging = true;
+      });
+      
+      renderer.domElement.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const deltaMove = {
+          x: e.offsetX - previousMousePosition.x,
+          y: e.offsetY - previousMousePosition.y
+        };
+        
+        scene.rotation.y += deltaMove.x * 0.01;
+        scene.rotation.x += deltaMove.y * 0.01;
+        
+        previousMousePosition = { x: e.offsetX, y: e.offsetY };
+      });
+      
+      renderer.domElement.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+      
+      // 动画循环
+      function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+      }
+      animate();
+      
+      // 窗口大小调整
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+    }
+    
+    // 日志输出
+    function log(message, type = 'info') {
+      const output = document.getElementById('log-output');
+      const timestamp = new Date().toLocaleTimeString();
+      const className = `log-${type}`;
+      output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+      output.scrollTop = output.scrollHeight;
+    }
+    
+    // 加载 GLB 文件
+    function loadGLB(file) {
+      log(`开始加载文件：${file.name}`, 'info');
+      
+      // 显示基础信息
+      document.getElementById('info-panel').style.display = 'block';
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-size').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+      
+      const url = URL.createObjectURL(file);
+      const loader = new GLTFLoader();
+      
+      loader.load(
+        url,
+        (gltf) => {
+          log('✅ 模型加载成功！', 'success');
+          
+          // 基础数据
+          document.getElementById('scene-count').textContent = gltf.scenes?.length || 0;
+          document.getElementById('mesh-count').textContent = gltf.meshes?.length || 0;
+          document.getElementById('material-count').textContent = gltf.materials?.length || 0;
+          document.getElementById('texture-count').textContent = gltf.textures?.length || 0;
+          document.getElementById('image-count').textContent = gltf.images?.length || 0;
+          document.getElementById('animation-count').textContent = gltf.animations?.length || 0;
+          
+          // 检查材质和纹理
+          checkMaterials(gltf);
+          
+          // 检查骨骼
+          checkBones(gltf);
+          
+          // 显示 3D 模型
+          displayModel(gltf);
+          
+          // 显示材质详情
+          document.getElementById('materials-section').style.display = 'block';
+        },
+        (progress) => {
+          if (progress.total > 0) {
+            const percent = ((progress.loaded / progress.total) * 100).toFixed(1);
+            log(`📥 加载进度：${percent}%`, 'info');
+          }
+        },
+        (error) => {
+          log(`❌ 加载失败：${error.message}`, 'error');
+        }
+      );
+    }
+    
+    // 检查材质和纹理
+    function checkMaterials(gltf) {
+      const materials = gltf.materials || [];
+      const container = document.getElementById('materials-list');
+      container.innerHTML = '';
+      
+      log(`\n🎨 材质总数：${materials.length}`, 'info');
+      
+      materials.forEach((material, index) => {
+        const card = document.createElement('div');
+        card.className = 'material-card';
+        
+        let textureBadges = '';
+        const textureMaps = {
+          '颜色贴图': material.map,
+          '法线贴图': material.normalMap,
+          '粗糙度贴图': material.roughnessMap,
+          '金属度贴图': material.metalnessMap,
+          '自发光贴图': material.emissiveMap,
+          '凹凸贴图': material.bumpMap,
+        };
+        
+        let hasTextures = false;
+        for (const [name, texture] of Object.entries(textureMaps)) {
+          if (texture) {
+            hasTextures = true;
+            textureBadges += `<span class="texture-badge">✅ ${name}</span>`;
+          } else {
+            textureBadges += `<span class="texture-badge missing">❌ ${name}</span>`;
+          }
+        }
+        
+        card.innerHTML = `
+          <h3>材质 #${index}: ${material.name || '未命名'}</h3>
+          <p><strong>类型:</strong> ${material.type}</p>
+          <p><strong>颜色:</strong> ${material.color ? '#' + material.color.getHexString() : '无'}</p>
+          <p><strong>金属度:</strong> ${(material.metalness ?? 0).toFixed(2)}</p>
+          <p><strong>粗糙度:</strong> ${(material.roughness ?? 1).toFixed(2)}</p>
+          <div style="margin-top: 10px;">${textureBadges}</div>
+          ${!hasTextures ? '<p style="color: #f44336; margin-top: 10px;">⚠️ 该材质没有任何纹理！(只有纯色)</p>' : ''}
+        `;
+        
+        container.appendChild(card);
+        
+        if (hasTextures) {
+          log(`  ✅ 材质 #${index} (${material.name || '未命名'}): 有纹理`, 'success');
+        } else {
+          log(`  ❌ 材质 #${index} (${material.name || '未命名'}): 无纹理 (纯色)`, 'warning');
+        }
+      });
+      
+      // 统计有纹理的材质数量
+      const materialsWithTextures = materials.filter(m => m.map || m.normalMap || m.roughnessMap).length;
+      log(`\n📊 有纹理的材质：${materialsWithTextures}/${materials.length}`, 'info');
+      
+      if (materialsWithTextures === 0) {
+        log('⚠️ 警告：模型没有任何纹理！可能是导出时未嵌入纹理。', 'warning');
+      }
+    }
+    
+    // 检查骨骼
+    function checkBones(gltf) {
+      let boneCount = 0;
+      let skinnedMeshCount = 0;
+      
+      gltf.scene.traverse((node) => {
+        if (node.isBone) boneCount++;
+        if (node.isSkinnedMesh) skinnedMeshCount++;
+      });
+      
+      document.getElementById('bone-count').textContent = boneCount;
+      
+      log(`\n🦴 骨骼总数：${boneCount}`, 'info');
+      log(`🦴 蒙皮网格数：${skinnedMeshCount}`, 'info');
+      
+      if (boneCount === 0) {
+        log('⚠️ 警告：模型没有骨骼绑定！动画可能无法播放。', 'warning');
+      }
+    }
+    
+    // 显示 3D 模型
+    function displayModel(gltf) {
+      // 清空场景
+      while(scene.children.length > 0) {
+        scene.remove(scene.children[0]);
+      }
+      
+      // 重新添加灯光
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 5, 5);
+      scene.add(directionalLight);
+      
+      // 添加模型
+      const model = gltf.scene;
+      model.scale.set(1, 1, 1);
+      model.position.set(0, 0, 0);
+      scene.add(model);
+      
+      log('✅ 模型已显示在预览窗口中，可以鼠标拖动旋转查看', 'success');
+    }
+    
+    // 文件拖拽处理
+    const dropZone = document.getElementById('drop-zone');
+    
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        loadGLB(files[0]);
+      }
+    });
+    
+    // 文件选择处理
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadGLB(e.target.files[0]);
+      }
+    });
+    
+    // 初始化
+    init3D();
+    log('🦞 GLB 检查工具已就绪，请拖拽或选择文件', 'success');
+  </script>
+</body>
+</html>

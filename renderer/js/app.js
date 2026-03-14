@@ -451,14 +451,39 @@ function setupMouseControls() {
     e.preventDefault();
     showContextMenu(e.clientX, e.clientY);
   });
+  
+  // ⭐ 点击 canvas 时关闭菜单
+  canvas.addEventListener('mousedown', () => {
+    const menu = document.getElementById('context-menu');
+    if (menu) {
+      menu.classList.add('hidden');
+      if (menuAutoHideTimer) {
+        clearTimeout(menuAutoHideTimer);
+        menuAutoHideTimer = null;
+      }
+    }
+  });
 }
+
+let menuAutoHideTimer = null;  // ⭐ 菜单自动关闭定时器
 
 function showContextMenu(x, y) {
   const menu = document.getElementById('context-menu');
   if (menu) {
+    // ⭐ 清除之前的定时器
+    if (menuAutoHideTimer) {
+      clearTimeout(menuAutoHideTimer);
+    }
+    
     menu.style.left = x + 'px';
     menu.style.top = y + 'px';
     menu.classList.remove('hidden');
+    
+    // ⭐ 5 秒后自动关闭菜单
+    menuAutoHideTimer = setTimeout(() => {
+      menu.classList.add('hidden');
+      console.log('⏰ 菜单自动关闭（5 秒无操作）');
+    }, 5000);
     
     menu.querySelectorAll('.menu-item').forEach(item => {
       item.onclick = (e) => {
@@ -466,6 +491,12 @@ function showContextMenu(x, y) {
         const action = item.getAttribute('data-action');
         if (action) handleMenuAction(action);
         menu.classList.add('hidden');
+        
+        // ⭐ 点击菜单项时清除定时器
+        if (menuAutoHideTimer) {
+          clearTimeout(menuAutoHideTimer);
+          menuAutoHideTimer = null;
+        }
       };
     });
   }
@@ -653,7 +684,7 @@ async function init() {
   
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, -0.3, 5);
+  camera.position.set(0, 0.6, 5);  // ⭐ 相机 Y 轴：0.3 → 0.6（相机更上移，模型看起来更下移）
   
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);

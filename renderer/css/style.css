@@ -31,7 +31,7 @@ body {
 /* 对话气泡 - 居中显示在哈基虾上方 */
 #speech-bubble {
   position: absolute;
-  top: 50px;
+  top: 10px;  /* ⭐ 气泡 top：50px → 10px（更靠近顶部） */
   left: 50%;
   transform: translateX(-50%);
   background: white;
