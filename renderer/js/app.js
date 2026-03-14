@@ -540,19 +540,7 @@ function handleMenuAction(action) {
         websocket.send(JSON.stringify({ type: 'chat', message: '你好！' }));
       }
       break;
-    case 'rotate':
-      if (pet) {
-        let count = 0;
-        const totalRotations = 21;
-        const interval = setInterval(() => {
-          pet.rotation.y += 0.3;
-          if (++count >= totalRotations) {
-            clearInterval(interval);
-            console.log('✅ 360° 旋转完成');
-          }
-        }, 50);
-      }
-      break;
+    // 'rotate' 已删除，替换为新特效
     case 'status':
       showBubble(`状态：${colorRenderer.currentLevel}`, false);
       break;
@@ -761,74 +749,158 @@ let disableAnimationUpdate = false;
 function triggerScheduledAction() {
   if (!pet || isActionInProgress) return;
   
-  const actions = ['rotateCW', 'rotateCCW', 'jump', 'pulse'];
+  // ⭐ 新特效列表：删除旋转，添加更有趣的动作
+  const actions = ['wiggle', 'bounce', 'shake', 'stretch', 'spiral'];
   const action = actions[Math.floor(Math.random() * actions.length)];
   
   console.log('⏰ 定时触发:', action, '✨');
   isActionInProgress = true;
   
-  // ⭐ 触发粒子特效（使用 wrapper 的位置）
+  // ⭐ 触发粒子特效
   if (particleManager) {
     particleManager.triggerEffect(action, petWrapper ? petWrapper.position : pet.position);
   }
   
   switch(action) {
-    case 'rotateCW':
-      // ⭐ 顺时针旋转一圈（使用 setInterval，之前成功实现的方式）
-      let cwCount = 0;
-      const cwInterval = setInterval(() => {
-        pet.rotation.y += 0.2;
-        if (++cwCount >= 32) {  // 32 * 0.2 ≈ 6.4 弧度 ≈ 360°
-          clearInterval(cwInterval);
-          isActionInProgress = false;
-          console.log('✅ 顺时针旋转完成 + 星光轨迹特效');
-        }
-      }, 16);
-      break;
-      
-    case 'rotateCCW':
-      // ⭐ 逆时针旋转一圈
-      let ccwCount = 0;
-      const ccwInterval = setInterval(() => {
-        pet.rotation.y -= 0.2;
-        if (++ccwCount >= 32) {
-          clearInterval(ccwInterval);
-          isActionInProgress = false;
-          console.log('✅ 逆时针旋转完成 + 星光轨迹特效');
-        }
-      }, 16);
-      break;
-      
-    case 'jump':
-      // ⭐ 跳跃
-      let jumpProgress = 0;
-      const jumpInterval = setInterval(() => {
-        jumpProgress += 0.05;
-        if (jumpProgress <= Math.PI) {
-          pet.position.y = Math.sin(jumpProgress) * 0.5;
+    case 'wiggle':
+      // ⭐ 左右摇摆（像跳舞一样）
+      let wiggleProgress = 0;
+      const wiggleInterval = setInterval(() => {
+        wiggleProgress += 0.15;
+        if (wiggleProgress <= Math.PI * 2) {
+          const rotation = Math.sin(wiggleProgress) * 0.4;
+          if (petWrapper) {
+            petWrapper.rotation.z = rotation;
+          } else {
+            pet.rotation.z = rotation;
+          }
         } else {
-          clearInterval(jumpInterval);
-          pet.position.y = 0;
+          clearInterval(wiggleInterval);
+          if (petWrapper) petWrapper.rotation.z = 0;
+          else pet.rotation.z = 0;
           isActionInProgress = false;
-          console.log('✅ 跳跃完成 + 拖尾粒子 + 冲击波特效');
+          console.log('✅ 摇摆舞完成 + 彩色粒子特效');
         }
       }, 16);
       break;
       
-    case 'pulse':
-      // ⭐ 脉冲缩放动作
-      let pulseProgress = 0;
-      const initialScale = pet.scale.x;  // ⭐ 保存初始缩放（GLB 是 2）
-      const pulseInterval = setInterval(() => {
-        pulseProgress += 0.1;
-        if (pulseProgress <= Math.PI * 2) {
-          const scale = initialScale + Math.sin(pulseProgress) * 0.3;
-          pet.scale.set(scale, scale, scale);
+    case 'bounce':
+      // ⭐ 连续弹跳（像皮球一样）
+      let bounceCount = 0;
+      const bounceInterval = setInterval(() => {
+        bounceCount++;
+        if (bounceCount <= 5) {
+          // 5 次弹跳，高度递减
+          const jumpHeight = 0.6 * Math.pow(0.7, bounceCount);
+          let jumpProgress = 0;
+          const jumpInterval = setInterval(() => {
+            jumpProgress += 0.1;
+            if (jumpProgress <= Math.PI) {
+              if (petWrapper) {
+                petWrapper.position.y = Math.sin(jumpProgress) * jumpHeight;
+              } else {
+                pet.position.y = Math.sin(jumpProgress) * jumpHeight;
+              }
+            } else {
+              clearInterval(jumpInterval);
+            }
+          }, 16);
         } else {
-          clearInterval(pulseInterval);
-          pet.scale.set(initialScale, initialScale, initialScale);
+          clearInterval(bounceInterval);
+          if (petWrapper) petWrapper.position.y = 0;
+          else pet.position.y = 0;
           isActionInProgress = false;
-          console.log('✅ 脉冲缩放完成 + 光环特效');
+          console.log('✅ 连续弹跳完成 + 弹跳粒子特效');
+        }
+      }, 400);
+      break;
+      
+    case 'shake':
+      // ⭐ 快速抖动（像兴奋/紧张一样）
+      let shakeCount = 0;
+      const shakeInterval = setInterval(() => {
+        shakeCount++;
+        if (shakeCount <= 15) {
+          const offset = (Math.random() - 0.5) * 0.3;
+          if (petWrapper) {
+            petWrapper.position.x = offset;
+            petWrapper.rotation.y += (Math.random() - 0.5) * 0.2;
+          } else {
+            pet.position.x = offset;
+            pet.rotation.y += (Math.random() - 0.5) * 0.2;
+          }
+        } else {
+          clearInterval(shakeInterval);
+          if (petWrapper) {
+            petWrapper.position.x = 0;
+            petWrapper.rotation.y = 0;
+          } else {
+            pet.position.x = 0;
+            pet.rotation.y = 0;
+          }
+          isActionInProgress = false;
+          console.log('✅ 快速抖动完成 + 震动粒子特效');
+        }
+      }, 30);
+      break;
+      
+    case 'stretch':
+      // ⭐ 拉伸挤压（像果冻一样）
+      let stretchProgress = 0;
+      const initialScale = pet.scale.x;
+      const stretchInterval = setInterval(() => {
+        stretchProgress += 0.1;
+        if (stretchProgress <= Math.PI * 2) {
+          const stretch = Math.sin(stretchProgress) * 0.2;
+          // 拉伸时保持体积不变（Y 轴拉长，XZ 轴缩小）
+          const scaleY = initialScale + stretch;
+          const scaleXZ = initialScale - stretch * 0.5;
+          if (petWrapper) {
+            petWrapper.scale.set(scaleXZ, scaleY, scaleXZ);
+          } else {
+            pet.scale.set(scaleXZ, scaleY, scaleXZ);
+          }
+        } else {
+          clearInterval(stretchInterval);
+          if (petWrapper) {
+            petWrapper.scale.set(initialScale, initialScale, initialScale);
+          } else {
+            pet.scale.set(initialScale, initialScale, initialScale);
+          }
+          isActionInProgress = false;
+          console.log('✅ 拉伸挤压完成 + 果冻粒子特效');
+        }
+      }, 16);
+      break;
+      
+    case 'spiral':
+      // ⭐ 螺旋上升（像龙卷风一样）
+      let spiralProgress = 0;
+      const spiralInterval = setInterval(() => {
+        spiralProgress += 0.08;
+        if (spiralProgress <= Math.PI * 4) {
+          const radius = 0.8;
+          const x = Math.cos(spiralProgress) * radius;
+          const z = Math.sin(spiralProgress) * radius;
+          const y = spiralProgress * 0.15;
+          if (petWrapper) {
+            petWrapper.position.set(x, y, z);
+            petWrapper.rotation.y = -spiralProgress;
+          } else {
+            pet.position.set(x, y, z);
+            pet.rotation.y = -spiralProgress;
+          }
+        } else {
+          clearInterval(spiralInterval);
+          if (petWrapper) {
+            petWrapper.position.set(0, 0, 0);
+            petWrapper.rotation.y = 0;
+          } else {
+            pet.position.set(0, 0, 0);
+            pet.rotation.y = 0;
+          }
+          isActionInProgress = false;
+          console.log('✅ 螺旋上升完成 + 旋风粒子特效');
         }
       }, 16);
       break;
