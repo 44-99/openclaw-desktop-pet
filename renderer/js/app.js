@@ -745,21 +745,101 @@ async function init() {
 // ⭐ 临时禁用动画控制器的标志
 let disableAnimationUpdate = false;
 
+// ==================== 特效类型定义 ====================
+const EFFECT_TYPES = [
+  'star_trail',      // 星光轨迹（旋转）
+  'rotation_ring',   // 旋转光环
+  'trail',           // 拖尾粒子（跳跃）
+  'shockwave',       // 冲击波（跳跃落地）
+  'expansion_ring',  // 扩张光环（脉冲）
+  'spark',           // 电火花（抖动）
+  'aura',            // 呼吸光晕
+  'floating_glow'    // 漂浮微光
+];
+
+// ==================== 动作与特效映射 ====================
+const ACTION_EFFECT_MAP = {
+  'wiggle': ['star_trail', 'floating_glow', 'aura'],           // 摇摆舞：星光/微光/光晕
+  'bounce': ['trail', 'shockwave', 'expansion_ring'],          // 弹跳：拖尾/冲击波/光环
+  'shake': ['spark', 'expansion_ring', 'star_trail'],          // 抖动：火花/光环/星光
+  'stretch': ['aura', 'floating_glow', 'expansion_ring'],      // 拉伸：光晕/微光/光环
+  'spiral': ['star_trail', 'trail', 'floating_glow'],          // 螺旋：星光/拖尾/微光
+  'jump': ['trail', 'shockwave', 'star_trail'],                // 跳跃：拖尾/冲击波/星光
+};
+
+// ==================== 触发动作对应的特效 ====================
+function triggerActionEffects(actionType, petPosition) {
+  if (!particleManager) return;
+  
+  // 获取该动作可用的特效列表
+  const availableEffects = ACTION_EFFECT_MAP[actionType] || ['expansion_ring'];
+  
+  // 随机选择 1-2 个特效
+  const effectCount = Math.random() > 0.6 ? 2 : 1;  // 40% 概率触发 2 个特效
+  const selectedEffects = [];
+  
+  for (let i = 0; i < effectCount && availableEffects.length > 0; i++) {
+    const effectIndex = Math.floor(Math.random() * availableEffects.length);
+    const effect = availableEffects.splice(effectIndex, 1)[0];
+    selectedEffects.push(effect);
+  }
+  
+  console.log(`✨ 动作 "${actionType}" 触发特效：${selectedEffects.join(', ')}`);
+  
+  // 触发每个特效
+  selectedEffects.forEach(effectType => {
+    switch(effectType) {
+      case 'star_trail':
+        // 星光轨迹（需要导入 StarTrailParticle）
+        break;
+      case 'trail':
+        // 拖尾粒子（需要导入 TrailParticle）
+        break;
+      case 'shockwave':
+        // 冲击波（需要导入 ShockwaveParticle）
+        break;
+      case 'expansion_ring':
+        // 扩张光环
+        break;
+      case 'spark':
+        // 电火花
+        break;
+      case 'aura':
+        // 呼吸光晕
+        break;
+      case 'floating_glow':
+        // 漂浮微光
+        break;
+    }
+  });
+  
+  // ⭐ 简化版：使用现有的 triggerEffect 系统，传入随机特效类型
+  // 将动作映射到现有的特效触发器
+  const effectMapping = {
+    'star_trail': 'rotateCW',
+    'trail': 'jump',
+    'shockwave': 'jump',
+    'expansion_ring': 'pulse',
+  };
+  
+  const primaryEffect = selectedEffects[0];
+  const mappedEffect = effectMapping[primaryEffect] || 'pulse';
+  particleManager.triggerEffect(mappedEffect, petPosition);
+}
+
 // ==================== 定时动作触发器 ====================
 function triggerScheduledAction() {
   if (!pet || isActionInProgress) return;
   
-  // ⭐ 新特效列表：删除旋转，添加更有趣的动作
-  const actions = ['wiggle', 'bounce', 'shake', 'stretch', 'spiral'];
+  // ⭐ 动作列表：包含跳跃
+  const actions = ['wiggle', 'bounce', 'shake', 'stretch', 'spiral', 'jump'];
   const action = actions[Math.floor(Math.random() * actions.length)];
   
   console.log('⏰ 定时触发:', action, '✨');
   isActionInProgress = true;
   
-  // ⭐ 触发粒子特效
-  if (particleManager) {
-    particleManager.triggerEffect(action, petWrapper ? petWrapper.position : pet.position);
-  }
+  // ⭐ 触发粒子特效（动作与特效解耦，随机搭配）
+  triggerActionEffects(action, petWrapper ? petWrapper.position : pet.position);
   
   switch(action) {
     case 'wiggle':
@@ -779,7 +859,7 @@ function triggerScheduledAction() {
           if (petWrapper) petWrapper.rotation.z = 0;
           else pet.rotation.z = 0;
           isActionInProgress = false;
-          console.log('✅ 摇摆舞完成（加长版）+ 彩色粒子特效');
+          console.log('✅ 摇摆舞完成（加长版）');
         }
       }, 16);
       break;
@@ -810,7 +890,7 @@ function triggerScheduledAction() {
           if (petWrapper) petWrapper.position.y = 0;
           else pet.position.y = 0;
           isActionInProgress = false;
-          console.log('✅ 连续弹跳完成（7 次）+ 弹跳粒子特效');
+          console.log('✅ 连续弹跳完成（7 次）');
         }
       }, 400);
       break;
@@ -839,7 +919,7 @@ function triggerScheduledAction() {
             pet.rotation.y = 0;
           }
           isActionInProgress = false;
-          console.log('✅ 快速抖动完成（20 次）+ 震动粒子特效');
+          console.log('✅ 快速抖动完成（20 次）');
         }
       }, 30);
       break;
@@ -869,7 +949,7 @@ function triggerScheduledAction() {
             pet.scale.set(initialScale, initialScale, initialScale);
           }
           isActionInProgress = false;
-          console.log('✅ 拉伸挤压完成（修复方向）+ 果冻粒子特效');
+          console.log('✅ 拉伸挤压完成（修复方向）');
         }
       }, 16);
       break;
@@ -903,7 +983,28 @@ function triggerScheduledAction() {
             pet.rotation.y = 0;
           }
           isActionInProgress = false;
-          console.log(`✅ 螺旋上升完成（1080° ${direction > 0 ? '顺时针' : '逆时针'}）+ 旋风粒子特效`);
+          console.log(`✅ 螺旋上升完成（1080° ${direction > 0 ? '顺时针' : '逆时针'}）`);
+        }
+      }, 16);
+      break;
+      
+    case 'jump':
+      // ⭐ 跳跃（恢复原始版本）
+      let jumpProgress = 0;
+      const jumpInterval = setInterval(() => {
+        jumpProgress += 0.05;
+        if (jumpProgress <= Math.PI) {
+          if (petWrapper) {
+            petWrapper.position.y = Math.sin(jumpProgress) * 0.5;
+          } else {
+            pet.position.y = Math.sin(jumpProgress) * 0.5;
+          }
+        } else {
+          clearInterval(jumpInterval);
+          if (petWrapper) petWrapper.position.y = 0;
+          else pet.position.y = 0;
+          isActionInProgress = false;
+          console.log('✅ 跳跃完成');
         }
       }, 16);
       break;
