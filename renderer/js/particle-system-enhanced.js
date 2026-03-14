@@ -399,7 +399,7 @@ class SparkParticle {
   constructor(scene, petPosition) {
     this.scene = scene;
     this.petPosition = petPosition;
-    this.particleCount = 50;  // 50 个电火花粒子
+    this.particleCount = 100;  // 100 个电火花粒子
     this.clock = new THREE.Clock();
     
     this.init();
