@@ -9,20 +9,19 @@
 const TOPIC_TYPES = {
   MEMORY_FUTURE: 'memory_future',     // 基于记忆 - 未来
   MEMORY_PAST: 'memory_past',         // 基于记忆 - 过去
-  MEMORY_PRESENT: 'memory_present',   // 基于记忆 - 现在
   NEWS: 'news',                       // 搜索新闻
   KNOWLEDGE: 'knowledge'              // 知识类话题
 };
 
-// 知识类话题分类
-const KNOWLEDGE_CATEGORIES = [
+const TOPIC_CATEGORIES = [
   '历史政治',
   '哲学人生',
   '科技金融',
-  '古人传奇',
-  '现代名人',
+  '神话传说',
+  '古今名人',
   'AI 发展',
-  '男女情感'
+  '男女情感',
+  '校园青春'
 ];
 
 class TopicGenerator {
@@ -152,21 +151,15 @@ class TopicGenerator {
    */
   selectTopicType() {
     const rand = Math.random() * 100;
-    const subRand = Math.random() * 100;
-    
-    console.log(`🎲 话题类型随机数：${rand.toFixed(1)}, ${subRand.toFixed(1)}`);
-    
+    console.log(`🎲 话题类型随机数：${rand.toFixed(1)}`);
     // 60% 基于记忆
     if (rand < 60) {
-      if (subRand < 33) {
+      if (rand < 30) {
         console.log('🎯 话题类型：记忆 - 未来');
         return TOPIC_TYPES.MEMORY_FUTURE;
-      } else if (subRand < 66) {
+      } else {
         console.log('🎯 话题类型：记忆 - 过去');
         return TOPIC_TYPES.MEMORY_PAST;
-      } else {
-        console.log('🎯 话题类型：记忆 - 现在');
-        return TOPIC_TYPES.MEMORY_PRESENT;
       }
     }
     // 20% 搜索新闻（如果有 API）
@@ -229,101 +222,43 @@ class TopicGenerator {
     let memorySection = '';
     if (this.memoryCache.soul || this.memoryCache.memory || this.memoryCache.today || this.memoryCache.user || this.memoryCache.identity) {
       memorySection = `
-【记忆内容】
-${this.memoryCache.soul ? `人格：${this.memoryCache.soul}` : ''}
-${this.memoryCache.memory ? `长期记忆：${this.memoryCache.memory}` : ''}
-${this.memoryCache.today ? `今日笔记：${this.memoryCache.today}` : ''}
-${this.memoryCache.user ? `用户信息：${this.memoryCache.user}` : ''}
-${this.memoryCache.identity ? `我的身份：${this.memoryCache.identity}` : ''}
-`;
+    ${this.memoryCache.soul ? `**人格**：${this.memoryCache.soul}` : ''}
+    ${this.memoryCache.user ? `**用户信息**：${this.memoryCache.user}` : ''}
+    ${this.memoryCache.identity ? `**我的身份信息**：${this.memoryCache.identity}` : ''}
+    说话语气：包括但不限于撒娇、好奇、阴阳怪气、抱怨、生气、嘲讽、伤心等其他语气，带 emoji，20 字以内`;
     } else {
       memorySection = '\n【提示】没有可用的记忆内容，请自由发挥。\n';
     }
     
-    // 统一的 basePrompt（所有话题类型共用）
-    const basePrompt = `你是一只 AI 龙虾助手，正在和主人聊天。
-
-【人格设定】
-- 温暖、有趣、有点小调皮
-- 像朋友、小弟，活泼幽默
--  genuinely helpful，但不说套话
-${memorySection}`;
-
-    // 统一的【要求】（所有话题类型共用）
-    const requirements = `
-【要求】
-- 用一种特别的语气说 1-2 句话（包括但不限于撒娇、期待、好奇、抱怨、生气、嘲讽、伤心等其他语气）
-- 带 1-2 个 emoji
-- 40 字以内
-
-请生成话题：`;
-
-    // 不同话题类型的【任务】+【重要】
+    const basePrompt = `【认知记忆】\n${memorySection}\n\n【任务要求】\n`;
     let taskSection = '';
-    
+    let issueSection = `${this.memoryCache.memory ? `长期记忆：${this.memoryCache.memory}` : ''}
+    ${this.memoryCache.today ? `今日笔记：${this.memoryCache.today}` : ''}`;
     switch (topicType) {
       case TOPIC_TYPES.MEMORY_FUTURE:
-        taskSection = `
-【任务】
-基于以上记忆，提出一个关于**未来发展/计划**的话题。
-
-【重要】
-- 必须引用记忆中的具体内容（项目、学习、计划）
-- 不要说空话，要具体、有针对性`;
+        taskSection = `${issueSection}
+        基于以上记忆，提出一个关于**未来发展/计划**的话题。`;
         break;
         
       case TOPIC_TYPES.MEMORY_PAST:
-        taskSection = `
-【任务】
-基于以上记忆，提出一个关于**过去回忆/学到的东西**的话题。
-
-【重要】
-- 必须引用记忆中的具体内容（学到的东西、经历的事）
-- 不要说空话，要具体、有针对性`;
-        break;
-        
-      case TOPIC_TYPES.MEMORY_PRESENT:
-        taskSection = `
-【任务】
-基于以上记忆，提出一个关于**现在在做的事**的话题。
-
-【重要】
-- 必须引用记忆中的具体内容（当前项目、正在进行的事）
-- 不要说空话，要具体、有针对性`;
+        taskSection = `${issueSection}
+        基于以上记忆，提出一个关于**过去回忆中发生的事**的话题。`;
         break;
         
       case TOPIC_TYPES.NEWS:
-        taskSection = `
-【任务】
-搜索最新新闻，提出一个有趣的话题。
-
-【重要】
-- 可以是科技智能、社会文化、金融经济、人文地理、历史政治、爱情情感等任何领域
-- 要有趣/有梗/有讨论价值`;
+        taskSection = `调用 openclaw-tavily-search Skill 搜索最新新闻，提出一个有趣的话题。可以是${TOPIC_CATEGORIES.join('、')}等任何领域，要有趣/有梗/有讨论价值`;
         break;
         
       case TOPIC_TYPES.KNOWLEDGE:
-        const category = KNOWLEDGE_CATEGORIES[Math.floor(Math.random() * KNOWLEDGE_CATEGORIES.length)];
-        taskSection = `
-【任务】
-提出一个关于**${category}**的话题。
-
-【重要】
-- 可以是知识、观点、讨论
-- 要有趣、有深度`;
+        const category = TOPIC_CATEGORIES[Math.floor(Math.random() * TOPIC_CATEGORIES.length)];
+        taskSection = `提出一个关于**${category}**的话题，可以是知识、观点、讨论，要有趣、有深度`;
         break;
         
       default:
-        taskSection = `
-【任务】
-和我聊聊天吧～
-
-【重要】
-- 可以是任何话题
-- 要有趣、自然`;
+        taskSection = `随机提出一个话题`;
     }
     
-    return basePrompt + taskSection + requirements;
+    return basePrompt + taskSection;
   }
   
   /**
@@ -344,4 +279,4 @@ ${memorySection}`;
 }
 
 // 导出
-export { TopicGenerator, TOPIC_TYPES, KNOWLEDGE_CATEGORIES };
+export { TopicGenerator, TOPIC_TYPES, TOPIC_CATEGORIES };

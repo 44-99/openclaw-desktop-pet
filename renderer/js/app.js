@@ -409,12 +409,26 @@ function setupMouseControls() {
       
       if (!isLeftDragging && clickDuration < LONG_CLICK_THRESHOLD) {
         console.log('🖱️ 左键单击，生成话题...');
+        
         if (topicGenerator) {
+          // ⭐ 检查是否正在等待
+          if (topicGenerator.isBusy()) {
+            // 安抚用户（不自动隐藏，防止消失后用户更急）
+            showBubble('别急嘛，正在努力思考中～🤔', false);
+            return;
+          }
+          
+          // ⭐ 显示"思考中"提示（不自动隐藏，等结果出来）
+          showBubble('让我想想哦～🤔', false);
+          
           topicGenerator.generateTopic().then(topic => {
             if (topic) {
               console.log('✅ 生成话题:', topic);
-              // ⭐ 显示话题到气泡
-              showBubble(topic, true);
+              // ⭐ 显示实际话题（不自动隐藏，用于后续开启对话）
+              showBubble(topic, false);
+            } else {
+              // ⭐ 生成失败：显示错误原因（8 秒后自动隐藏）
+              showBubble('网络开小差了，再试一次吧～🌊', true);
             }
           });
         }

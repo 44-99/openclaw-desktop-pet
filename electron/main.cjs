@@ -600,7 +600,7 @@ ipcMain.handle('get-memory-files', async () => {
   try {
     const os = require('os');
     const workspaceDir = path.join(os.homedir(), '.openclaw', 'workspace');
-    const memoryDir = path.join(os.homedir(), '.openclaw', 'memory');
+    const memoryDir = path.join(os.homedir(), '.openclaw', 'workspace', 'memory');
     
     // 读取今日笔记
     const today = new Date().toISOString().split('T')[0];
@@ -619,14 +619,14 @@ ipcMain.handle('get-memory-files', async () => {
     }
     
     // 读取 MEMORY.md
-    const memoryMdPath = path.join(memoryDir, '..', 'MEMORY.md');
+    const memoryMdPath = path.join(workspaceDir, 'MEMORY.md');
     if (fs.existsSync(memoryMdPath)) {
       memory = fs.readFileSync(memoryMdPath, 'utf8');
     }
     
     // 读取今日笔记
     if (fs.existsSync(todayPath)) {
-      todayNote = fs.readFileSync(todayPath, 'utf8').substring(0, 500);
+      todayNote = fs.readFileSync(todayPath, 'utf8').substring(0, 200);
     }
     
     // 读取 USER.md
@@ -744,12 +744,9 @@ ipcMain.handle('has-tavily-api-key', async () => {
     const envPath = path.join(os.homedir(), '.openclaw', '.env');
     let hasKey = false;
     
-    console.log('🔍 检查 Tavily API Key 路径:', envPath);
-    
     // 检查 .env 文件是否存在
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf-8');
-      // 检查是否包含 TAVILY_API_KEY 且不为空
       hasKey = /^TAVILY_API_KEY=.+$/m.test(envContent);
       console.log('📄 .env 文件存在，TAVILY_API_KEY:', hasKey ? '✅ 有' : '❌ 无');
     } else {
@@ -759,10 +756,7 @@ ipcMain.handle('has-tavily-api-key', async () => {
     // 也检查环境变量
     if (!hasKey && process.env.TAVILY_API_KEY) {
       hasKey = true;
-      console.log('🌍 从环境变量检测到 TAVILY_API_KEY');
     }
-    
-    console.log('🔑 Tavily API Key 最终状态:', hasKey ? '✅ 有' : '❌ 无');
     return hasKey;
   } catch (error) {
     console.error('❌ 检查 Tavily API Key 失败:', error);
