@@ -246,7 +246,7 @@ class TopicGenerator {
         break;
         
       case TOPIC_TYPES.NEWS:
-        taskSection = `调用 openclaw-tavily-search Skill 搜索最新新闻，提出一个有趣的话题。可以是${TOPIC_CATEGORIES.join('、')}等任何领域，要有趣/有梗/有讨论价值`;
+        taskSection = `【工具调用】请使用 Tavily API 搜索最新新闻（工具名：tavily_search），然后基于搜索结果提出一个有趣的话题。可以是${TOPIC_CATEGORIES.join('、')}等任何领域，要有趣/有梗/有讨论价值。如果没有搜索工具可用，就凭你的知识聊一个相关话题。`;
         break;
         
       case TOPIC_TYPES.KNOWLEDGE:

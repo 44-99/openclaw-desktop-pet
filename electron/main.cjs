@@ -372,8 +372,7 @@ app.on('window-all-closed', (event) => {
 
 // 应用退出前（后备清理方案，确保 Python 进程被杀死）
 app.on('before-quit', (event) => {
-  if (pythonProcess) {
-    console.log('🦞 before-quit 触发，强制关闭 Python 后端...');
+  if (pythonProcess && pythonProcess.exitCode === null) {
     try {
       if (process.platform === 'win32') {
         const { execSync } = require('child_process');
@@ -381,9 +380,7 @@ app.on('before-quit', (event) => {
       } else {
         pythonProcess.kill('SIGTERM');
       }
-      console.log('✅ Python 后端已强制关闭');
     } catch (err) {
-      console.error('⚠️ 强制关闭 Python 失败：' + err.message);
     }
   }
 });
@@ -415,91 +412,74 @@ ipcMain.on('toggle-visibility', () => {
 // 退出应用（清理未打开的会话）
 ipcMain.on('quit-app', () => {
   // 写入日志文件（因为窗口关闭后看不到控制台输出）
-  const logFile = path.join(os.homedir(), '.openclaw', 'workspace', 'projects', 'openclaw-desktop-pet', 'cleanup.log');
+  const projectRoot = path.join(__dirname, '..');
+  const logFile = path.join(projectRoot, 'cleanup.log');
+  
+  // 确保目录存在
+  const logDir = path.dirname(logFile);
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  
   const log = (msg) => {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
     const line = `[${timestamp}] ${msg}\n`;
-    fs.appendFileSync(logFile, line, 'utf8');
+    try {
+      fs.appendFileSync(logFile, line, 'utf8');
+    } catch (e) {
+      // 日志写入失败不影响退出流程
+      console.error('❌ 日志写入失败:', e.message);
+    }
+    // 同时打印到控制台（方便调试）
+    console.log(msg);
   };
   
-  log('🦞 收到退出请求，清理会话中...');
-  
   try {
-    // 清理可能存在的未打开会话（同步操作，确保完成）
+    // 清理桌面宠物会话
     const sessionsPath = path.join(os.homedir(), '.openclaw', 'agents', 'main', 'sessions');
     const sessionsFile = path.join(sessionsPath, 'sessions.json');
-    
-    log(`📂 sessionsPath: ${sessionsPath}`);
-    log(`📄 sessionsFile: ${sessionsFile}`);
-    log(`📄 sessionsFile exists: ${fs.existsSync(sessionsFile)}`);
     
     if (fs.existsSync(sessionsFile)) {
       const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf8'));
       let cleaned = false;
-      let filesDeleted = 0;
       
-      log(`📋 总会话数：${Object.keys(sessions).length}`);
-      
-      // 查找所有桌面宠物会话
       for (const [key, value] of Object.entries(sessions)) {
         if (key.startsWith('agent:main:openai-user:desktop-pet:')) {
           const sessionId = value.sessionId;
           const transcriptFile = path.join(sessionsPath, `${sessionId}.jsonl`);
           
-          log(`🔍 找到桌面宠物会话：${key}`);
-          log(`   sessionId: ${sessionId}`);
-          log(`   transcriptFile: ${transcriptFile}`);
-          log(`   transcriptFile exists: ${fs.existsSync(transcriptFile)}`);
-          
           // 删除转录文件
           if (fs.existsSync(transcriptFile)) {
-            try {
-              fs.unlinkSync(transcriptFile);
-              filesDeleted++;
-              log(`✅ 已删除转录文件：${sessionId}.jsonl`);
-            } catch (err) {
-              log(`❌ 删除转录文件失败：${err.message}`);
-            }
-          } else {
-            log(`⚠️ 转录文件不存在：${transcriptFile}`);
+            fs.unlinkSync(transcriptFile);
           }
           
           // 删除会话条目
           delete sessions[key];
           cleaned = true;
-          log(`✅ 已从 sessions.json 删除：${key}`);
         }
       }
       
       // 保存更新后的 sessions.json
       if (cleaned) {
         fs.writeFileSync(sessionsFile, JSON.stringify(sessions, null, 2), 'utf8');
-        log(`✅ 会话清理完成 (删除 ${filesDeleted} 个文件，${Object.keys(sessions).length} 个剩余会话)`);
-      } else {
-        log('ℹ️ 没有找到桌面宠物会话');
+        log('✅ 清理桌面宠物会话完成');
       }
     }
   } catch (error) {
     log('❌ 清理会话失败：' + error.message);
-    log('   Stack: ' + error.stack);
   }
   
-  log('🦞 退出应用...');
-  
-  // 1. 先关闭 Python 后端
-  if (pythonProcess) {
-    log('🛑 停止 Python 后端...');
+  // 1. 先关闭 Python 后端（仅在进程仍在运行时）
+  if (pythonProcess && pythonProcess.exitCode === null) {
     try {
-      // Windows 下使用 taskkill 确保完全退出（包括子进程）
       if (process.platform === 'win32') {
         const { execSync } = require('child_process');
         execSync(`taskkill /F /PID ${pythonProcess.pid} 2>nul`, { stdio: 'ignore' });
       } else {
         pythonProcess.kill('SIGTERM');
       }
-      log('✅ Python 后端已停止');
     } catch (err) {
-      log('⚠️ 停止 Python 后端失败：' + err.message);
+      // 忽略错误（进程可能已自然退出）
     }
     pythonProcess = null;
   }
@@ -507,11 +487,9 @@ ipcMain.on('quit-app', () => {
   // 2. 关闭托盘
   if (tray) {
     tray.destroy();
-    log('✅ 托盘已销毁');
   }
   
   // 3. 退出应用
-  log('👋 再见！');
   app.quit();
 });
 
