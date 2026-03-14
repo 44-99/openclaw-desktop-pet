@@ -763,11 +763,11 @@ function triggerScheduledAction() {
   
   switch(action) {
     case 'wiggle':
-      // ⭐ 左右摇摆（像跳舞一样）
+      // ⭐ 左右摇摆（像跳舞一样）- 时间加长
       let wiggleProgress = 0;
       const wiggleInterval = setInterval(() => {
-        wiggleProgress += 0.15;
-        if (wiggleProgress <= Math.PI * 2) {
+        wiggleProgress += 0.1;  // 速度减慢，时间更长
+        if (wiggleProgress <= Math.PI * 4) {  // 2 圈 → 4 圈，时间加倍
           const rotation = Math.sin(wiggleProgress) * 0.4;
           if (petWrapper) {
             petWrapper.rotation.z = rotation;
@@ -779,18 +779,18 @@ function triggerScheduledAction() {
           if (petWrapper) petWrapper.rotation.z = 0;
           else pet.rotation.z = 0;
           isActionInProgress = false;
-          console.log('✅ 摇摆舞完成 + 彩色粒子特效');
+          console.log('✅ 摇摆舞完成（加长版）+ 彩色粒子特效');
         }
       }, 16);
       break;
       
     case 'bounce':
-      // ⭐ 连续弹跳（像皮球一样）
+      // ⭐ 连续弹跳（像皮球一样）- 改为 7 次
       let bounceCount = 0;
       const bounceInterval = setInterval(() => {
         bounceCount++;
-        if (bounceCount <= 5) {
-          // 5 次弹跳，高度递减
+        if (bounceCount <= 7) {  // 5 → 7 次
+          // 7 次弹跳，高度递减
           const jumpHeight = 0.6 * Math.pow(0.7, bounceCount);
           let jumpProgress = 0;
           const jumpInterval = setInterval(() => {
@@ -810,17 +810,17 @@ function triggerScheduledAction() {
           if (petWrapper) petWrapper.position.y = 0;
           else pet.position.y = 0;
           isActionInProgress = false;
-          console.log('✅ 连续弹跳完成 + 弹跳粒子特效');
+          console.log('✅ 连续弹跳完成（7 次）+ 弹跳粒子特效');
         }
       }, 400);
       break;
       
     case 'shake':
-      // ⭐ 快速抖动（像兴奋/紧张一样）
+      // ⭐ 快速抖动（像兴奋/紧张一样）- 改为 20 次
       let shakeCount = 0;
       const shakeInterval = setInterval(() => {
         shakeCount++;
-        if (shakeCount <= 15) {
+        if (shakeCount <= 20) {  // 15 → 20 次
           const offset = (Math.random() - 0.5) * 0.3;
           if (petWrapper) {
             petWrapper.position.x = offset;
@@ -839,22 +839,23 @@ function triggerScheduledAction() {
             pet.rotation.y = 0;
           }
           isActionInProgress = false;
-          console.log('✅ 快速抖动完成 + 震动粒子特效');
+          console.log('✅ 快速抖动完成（20 次）+ 震动粒子特效');
         }
       }, 30);
       break;
       
     case 'stretch':
-      // ⭐ 拉伸挤压（像果冻一样）
+      // ⭐ 拉伸挤压（像果冻一样）- 修复变形方向
       let stretchProgress = 0;
       const initialScale = pet.scale.x;
       const stretchInterval = setInterval(() => {
-        stretchProgress += 0.1;
+        stretchProgress += 0.12;
         if (stretchProgress <= Math.PI * 2) {
-          const stretch = Math.sin(stretchProgress) * 0.2;
-          // 拉伸时保持体积不变（Y 轴拉长，XZ 轴缩小）
-          const scaleY = initialScale + stretch;
-          const scaleXZ = initialScale - stretch * 0.5;
+          const stretch = Math.sin(stretchProgress) * 0.15;  // 幅度减小，更自然
+          // 拉伸挤压：Y 轴压缩时 XZ 轴扩大（像真正的挤压）
+          // Y 轴拉长时 XZ 轴缩小（像真正的拉伸）
+          const scaleY = initialScale * (1 - stretch);  // Y 轴反向变化
+          const scaleXZ = initialScale * (1 + stretch * 0.6);  // XZ 轴正向变化，幅度减小
           if (petWrapper) {
             petWrapper.scale.set(scaleXZ, scaleY, scaleXZ);
           } else {
@@ -868,27 +869,29 @@ function triggerScheduledAction() {
             pet.scale.set(initialScale, initialScale, initialScale);
           }
           isActionInProgress = false;
-          console.log('✅ 拉伸挤压完成 + 果冻粒子特效');
+          console.log('✅ 拉伸挤压完成（修复方向）+ 果冻粒子特效');
         }
       }, 16);
       break;
       
     case 'spiral':
-      // ⭐ 螺旋上升（像龙卷风一样）
+      // ⭐ 螺旋上升（像龙卷风一样）- 1080° + 随机方向
       let spiralProgress = 0;
+      // 随机方向：1 = 顺时针，-1 = 逆时针
+      const direction = Math.random() > 0.5 ? 1 : -1;
       const spiralInterval = setInterval(() => {
-        spiralProgress += 0.08;
-        if (spiralProgress <= Math.PI * 4) {
+        spiralProgress += 0.06;  // 速度稍慢，配合更多圈数
+        if (spiralProgress <= Math.PI * 6) {  // 4 圈 → 6 圈 = 1080°
           const radius = 0.8;
-          const x = Math.cos(spiralProgress) * radius;
-          const z = Math.sin(spiralProgress) * radius;
-          const y = spiralProgress * 0.15;
+          const x = Math.cos(spiralProgress * direction) * radius;
+          const z = Math.sin(spiralProgress * direction) * radius;
+          const y = spiralProgress * 0.12;  // 高度增量稍减，配合更多圈数
           if (petWrapper) {
             petWrapper.position.set(x, y, z);
-            petWrapper.rotation.y = -spiralProgress;
+            petWrapper.rotation.y = -spiralProgress * direction;
           } else {
             pet.position.set(x, y, z);
-            pet.rotation.y = -spiralProgress;
+            pet.rotation.y = -spiralProgress * direction;
           }
         } else {
           clearInterval(spiralInterval);
@@ -900,7 +903,7 @@ function triggerScheduledAction() {
             pet.rotation.y = 0;
           }
           isActionInProgress = false;
-          console.log('✅ 螺旋上升完成 + 旋风粒子特效');
+          console.log(`✅ 螺旋上升完成（1080° ${direction > 0 ? '顺时针' : '逆时针'}）+ 旋风粒子特效`);
         }
       }, 16);
       break;
