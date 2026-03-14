@@ -740,22 +740,29 @@ ipcMain.handle('open-desktop-pet-session', async (event, sessionKey) => {
 // 检查是否有 Tavily API Key
 ipcMain.handle('has-tavily-api-key', async () => {
   try {
+    // OpenClaw 项目级 .env 文件路径
     const envPath = path.join(os.homedir(), '.openclaw', '.env');
     let hasKey = false;
+    
+    console.log('🔍 检查 Tavily API Key 路径:', envPath);
     
     // 检查 .env 文件是否存在
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf-8');
       // 检查是否包含 TAVILY_API_KEY 且不为空
       hasKey = /^TAVILY_API_KEY=.+$/m.test(envContent);
+      console.log('📄 .env 文件存在，TAVILY_API_KEY:', hasKey ? '✅ 有' : '❌ 无');
+    } else {
+      console.log('⚠️ .env 文件不存在:', envPath);
     }
     
     // 也检查环境变量
     if (!hasKey && process.env.TAVILY_API_KEY) {
       hasKey = true;
+      console.log('🌍 从环境变量检测到 TAVILY_API_KEY');
     }
     
-    console.log('🔑 Tavily API Key 状态:', hasKey ? '✅ 有' : '❌ 无');
+    console.log('🔑 Tavily API Key 最终状态:', hasKey ? '✅ 有' : '❌ 无');
     return hasKey;
   } catch (error) {
     console.error('❌ 检查 Tavily API Key 失败:', error);
