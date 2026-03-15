@@ -2,13 +2,13 @@
 
 **发布时间**: 2026-03-15 14:25 CST  
 **分支**: `feature/model-import-v2`  
-**提交**: `83e8942`
+**提交**: `e26a251`
 
 ---
 
 ## 🎯 核心改进
 
-### 1. 系统负载 → 颜色（4 级，不可覆盖）
+### 1. 删除 15 秒随机动作系统
 
 **修复问题**：
 - ❌ `color-renderer.js` 初始化颜色索引越界（`PERFORMANCE_COLORS[4]` → `PERFORMANCE_COLORS[3]`）

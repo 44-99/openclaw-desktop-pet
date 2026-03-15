@@ -49,7 +49,7 @@ async function loadGLBModel() {
       scale: 2,        // 根据实际大小调整
       position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: -Math.PI / 2, z: 0 },
-      color: 0xFF4444,  // 默认龙虾红
+      color: 0xB0C4DE,  // 默认浅蓝色（系统空闲状态颜色）
       useFlatColor: true  // 使用纯色覆盖（即使模型有纹理）
     });
     
