@@ -20,10 +20,10 @@ const LEVEL_NAMES = ['夯爆了', '紧张', '忙碌', '空闲'];
 
 class ColorRenderer {
   /**
-   * @param {THREE.Group} petParts - 宠物组件引用
+   * @param {THREE.Group} pet - 宠物模型引用（可以是 pet 或 petWrapper）
    */
-  constructor(petParts) {
-    this.petParts = petParts;
+  constructor(pet) {
+    this.pet = pet;
     this.currentLevel = '空闲';
     this.currentColor = PERFORMANCE_COLORS[3]; // 默认浅蓝灰（索引 3 = 空闲）
   }
@@ -61,7 +61,7 @@ class ColorRenderer {
   }
   
   /**
-   * 应用颜色到龙虾身体（全身所有部位颜色一致）
+   * 应用颜色到模型（递归遍历所有 Mesh）
    * @param {number} color - 颜色值（hex）
    */
   applyColor(color) {
@@ -84,43 +84,10 @@ class ColorRenderer {
       }
     };
     
-    // 头胸部
-    applyToMesh(this.petParts.cephalothorax);
+    // 应用到整个模型（递归遍历所有 Mesh）
+    applyToMesh(this.pet);
     
-    // 腹部（3 节）
-    for (let i = 0; i < 3; i++) {
-      applyToMesh(this.petParts[`abdomen${i}`]);
-    }
-    
-    // 尾巴
-    applyToMesh(this.petParts.tail);
-    
-    // 钳子（左右）
-    applyToMesh(this.petParts.leftClaw);
-    applyToMesh(this.petParts.rightClaw);
-    
-    // 眼柄和眼球
-    applyToMesh(this.petParts.leftEyeStalk);
-    applyToMesh(this.petParts.rightEyeStalk);
-    applyToMesh(this.petParts.leftEyeball);
-    applyToMesh(this.petParts.rightEyeball);
-    
-    // 触角（长 + 短）
-    applyToMesh(this.petParts.leftAntenna);
-    applyToMesh(this.petParts.rightAntenna);
-    applyToMesh(this.petParts.leftShortAntenna);
-    applyToMesh(this.petParts.rightShortAntenna);
-    
-    // 步足（左右各 3 条）
-    for (let i = 0; i < 3; i++) {
-      applyToMesh(this.petParts[`leftLeg${i}`]);
-      applyToMesh(this.petParts[`rightLeg${i}`]);
-    }
-    
-    // 嘴巴
-    applyToMesh(this.petParts.mouth);
-    
-    console.log('🎨 全身颜色更新完成（所有部位颜色一致）');
+    console.log('🎨 全身颜色更新完成');
   }
   
   /**

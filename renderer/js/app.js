@@ -310,7 +310,7 @@ function createPetFallback() {
 // ==================== 初始化所有模块 ====================
 async function initModules() {
   // 1. 颜色渲染器
-  colorRenderer = new ColorRenderer(petParts);
+  colorRenderer = new ColorRenderer(pet);
   
   // 2. 情绪系统
   emotionSystem = new EmotionState();
