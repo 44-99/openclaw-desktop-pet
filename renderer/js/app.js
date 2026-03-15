@@ -583,7 +583,7 @@ function connectWebSocket() {
       websocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'topic_response' || data.type === 'auto_chat') {
+          if (data.type === 'topic_response') {
             showBubble(data.message || data.text, true);
           } else if (data.type === 'system_status') {
             handleSystemStatus(data);

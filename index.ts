@@ -3,6 +3,10 @@
  * 
  * @author 44-99
  * @version 1.0.0
+ * 
+ * ⚠️ 重要说明：OpenClaw Gateway 目前不支持 tool.call/session.start/session.end 等事件钩子
+ * 工具调用动画功能需要通过其他方式实现（如轮询会话日志、监听 WebSocket 等）
+ * 当前版本仅启动 Electron 和 Python 进程，工具调用事件监听暂不实现
  */
 
 import fs from 'fs';
@@ -28,7 +32,6 @@ let electronProcess: ChildProcess | null = null;
 let pythonProcess: ChildProcess | null = null;
 
 function getExtensionRoot() {
-  // __dirname 已经是 index.ts 所在目录
   return __dirname;
 }
 
@@ -63,7 +66,7 @@ function resolvePythonCommand() {
     const candidates = [
       path.join(extensionRoot, '.venv', 'Scripts', 'python.exe'),
       path.join(userOpenClawRoot, '.venv', 'Scripts', 'python.exe'),
-      'python',  // 使用系统 Python
+      'python',
     ];
 
     for (const candidate of candidates) {
@@ -106,7 +109,6 @@ function startElectron(config: ExtensionConfig) {
         PET_THEME: config.theme || 'default',
         PET_ALWAYS_ON_TOP: String(config.alwaysOnTop ?? true),
         PET_TRANSPARENT: String(config.transparent ?? true),
-        // 确保不传递任何会开启开发者工具的环境变量
         ELECTRON_ENABLE_LOGGING: undefined,
         ELECTRON_ENABLE_STACK_DUMPING: undefined,
         DEBUG: undefined,
@@ -184,7 +186,6 @@ function stopProcesses() {
   if (electronProcess) {
     console.log('🛑 停止 Electron...');
     if (process.platform === 'win32') {
-      // Windows 使用 taskkill 确保完全退出
       spawn('taskkill', ['/F', '/PID', String(electronProcess.pid)], { stdio: 'ignore' });
     } else {
       electronProcess.kill('SIGTERM');
@@ -213,10 +214,8 @@ function stopProcesses() {
 export default function register(api: any) {
   console.log('🦞 哈基虾 Extension 初始化...');
   
-  // 获取配置
   const config: ExtensionConfig = api.config || {};
   
-  // 检查是否启用
   if (config.enabled === false) {
     console.log('ℹ️ 哈基虾 Extension 已禁用，跳过初始化');
     return { dispose: () => {} };
@@ -226,73 +225,18 @@ export default function register(api: any) {
   startElectron(config);
   startPython();
   
-  // ========== P0-Core 核心工具（所有用户可用）==========
-  const CORE_TOOLS: Record<string, { summary: string; action: string }> = {
-    read: { summary: '读文件中...', action: 'wiggle' },
-    write: { summary: '写代码中...', action: 'bounce' },
-    edit: { summary: '编辑代码中...', action: 'shake' },
-    exec: { summary: '执行命令...', action: 'stretch' },
-  };
-
-  // ========== P0-Optional 可选工具（需要配置）==========
-  const OPTIONAL_TOOLS: Record<string, { summary: string; action: string }> = {
-    web_fetch: { summary: '查资料中...', action: 'spiral' },
-    browser: { summary: '操作浏览器...', action: 'jump' },
-  };
-
-  // 合并工具映射
-  const TOOL_MAP = { ...CORE_TOOLS, ...OPTIONAL_TOOLS };
-
-  // 监听工具调用事件
-  api.on?.('tool.call', async (event: any) => {
-    // 只处理已映射的工具
-    const toolConfig = TOOL_MAP[event.tool];
-    if (!toolConfig) return;
-    
-    const toolEvent = {
-      type: 'tool.call',
-      tool: event.tool,
-      summary: toolConfig.summary,
-      action: toolConfig.action,
-      timestamp: Date.now(),
-    };
-    
-    if (electronProcess) {
-      electronProcess.send?.(toolEvent);
-    }
-  });
-
-  // 监听会话开始
-  api.on?.('session.start', (session: any) => {
-    if (electronProcess) {
-      electronProcess.send?.({
-        type: 'session.start',
-        sessionId: session.id,
-        timestamp: Date.now(),
-      });
-    }
-  });
-
-  // 监听会话结束
-  api.on?.('session.end', (session: any) => {
-    if (electronProcess) {
-      electronProcess.send?.({
-        type: 'session.end',
-        sessionId: session.id,
-        timestamp: Date.now(),
-      });
-    }
-  });
+  // ⚠️ 注意：OpenClaw Gateway 目前不支持 tool.call/session.start/session.end 等事件钩子
+  // 日志显示：unknown typed hook "tool.call" ignored
+  // 工具调用动画功能需要后续通过其他方式实现（如轮询会话日志、WebSocket 监听等）
   
   // 监听配置变更
   api.onConfigChange?.((newConfig: ExtensionConfig) => {
     console.log('📝 配置已更新:', newConfig);
-    // TODO: 动态更新配置（如切换主题）
   });
   
   console.log('✅ 哈基虾 Extension 初始化完成');
+  console.log('⚠️ 工具调用动画功能暂未实现（Gateway 不支持事件钩子）');
   
-  // 返回清理函数
   return {
     dispose: () => {
       console.log('🦞 哈基虾 Extension 清理中...');
