@@ -24,6 +24,8 @@ export class ModelLoader {
       this.loader.load(
         url,
         (gltf) => {
+          console.log('模型加载成功:', url);
+          console.log('GLB 数据结构:', {
             scenes: gltf.scenes?.length,
             scene: gltf.scene,
             animations: gltf.animations?.length,
@@ -121,11 +123,7 @@ export class ModelLoader {
       this.currentColor = color;
     }
     
-      scale: model.scale,
-      position: model.position,
-      rotation: model.rotation,
-      color: color ? '#' + color.toString(16).padStart(6, '0') : '使用模型自带纹理'
-    });
+ 
     
     return model;
   }
