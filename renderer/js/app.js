@@ -9,7 +9,7 @@ import { InnerVoiceManager } from './inner-voice.js';
 import { ModelLoader } from './model-loader.js';
 import { AnimationController } from './animation-controller.js';
 // ==================== 导入增强粒子系统 ====================
-import { ParticleSystemManagerEnhanced } from './particle-system-enhanced.js';
+import { ParticleSystemManagerEnhanced, CodeRainParticle } from './particle-system-enhanced.js';
 // ==================== 全局变量 ====================
 let scene, camera, renderer, pet;
 let petParts = {};
@@ -46,11 +46,13 @@ async function loadGLBModel() {
     //
     petWrapper = new THREE.Group();
     
-    // 设置模型属性
+    // 设置模型属性（带颜色覆盖）
     pet = modelLoader.setup(gltf, {
       scale: 2,        // 根据实际大小调整
       position: { x: 0, y: 0, z: 0 },
-      rotation: { x: 0, y: -Math.PI / 2, z: 0 }
+      rotation: { x: 0, y: -Math.PI / 2, z: 0 },
+      color: 0xFF4444,  // 默认龙虾红
+      useFlatColor: true  // 使用纯色覆盖（即使模型有纹理）
     });
     
     //
@@ -515,6 +517,11 @@ function showContextMenu(x, y) {
   }
 }
 function handleMenuAction(action) {
+  // 📊 如果开启了系统状态监控，用户进行其他操作时关闭它
+  if (systemStatusMonitorEnabled && action !== 'status') {
+    systemStatusMonitorEnabled = false;
+    console.log('📊 系统状态监控模式：已关闭');
+  }
   
   switch(action) {
     case 'talk':
@@ -524,7 +531,13 @@ function handleMenuAction(action) {
       break;
     // 'rotate' 已删除，替换为新特效
     case 'status':
-      showBubble(`状态：${colorRenderer.currentLevel}`, false);
+      // 📊 进入系统状态实时监控模式
+      systemStatusMonitorEnabled = true;
+      
+      // 立即显示当前状态
+      showBubble(`💻 系统监控中... ${colorRenderer.currentLevel}`, false);
+      
+      console.log('📊 系统状态监控模式：已开启');
       break;
     case 'openclaw':
       if (topicGenerator) {
@@ -599,6 +612,8 @@ function connectWebSocket() {
             showBubble(data.message || data.text, true);
           } else if (data.type === 'system_status') {
             handleSystemStatus(data);
+          } else if (data.type === 'tool.call') {
+            handleToolCall(data);
           }
         } catch(e) {}
       };
@@ -617,14 +632,87 @@ function connectWebSocket() {
   
   tryConnect();
 }
+// ========== 工具事件处理 ==========
+let currentToolState = null;
+let toolActionInterval = null;
+let currentToolEffect = null;
+
+// ========== 系统状态监控模式 ==========
+let systemStatusMonitorEnabled = false;  // 是否开启实时监控模式
+
+// 处理工具调用事件（不改变颜色！）
+function handleToolCall(event) {
+  const { tool, summary, action } = event;
+  
+  console.log(`🔧 工具调用：${tool} - ${summary}`);
+  
+  // 1. 更新气泡（不消失，直到新工具到来）
+  showBubble(summary, false);  // autoHide=false，气泡不自动消失
+  
+  // 2. ❌ 不改变颜色！颜色只由系统负载决定
+  
+  // 3. 清除旧的动作循环
+  if (toolActionInterval) {
+    clearInterval(toolActionInterval);
+    isActionInProgress = false;
+  }
+  
+  // 4. 清除旧的特效
+  if (currentToolEffect) {
+    currentToolEffect.dispose();
+    currentToolEffect = null;
+  }
+  
+  // 5. 启动新动作循环
+  if (action && !isActionInProgress) {
+    // 立即执行一次
+    performAction(action);
+    
+    // 设置循环（每个动作完成后自动重播）
+    toolActionInterval = setInterval(() => {
+      if (!isActionInProgress) {
+        performAction(action);
+      }
+    }, 3000); // 3 秒检查一次
+  }
+  
+  // 6. 启动新特效
+  if (tool === 'exec' && typeof CodeRainParticle !== 'undefined') {
+    currentToolEffect = new CodeRainParticle(scene);
+  }
+  
+  // 7. 保存当前工具状态
+  currentToolState = { tool, action };
+  
+  // 8. 如果开启了系统状态监控，关闭它（工具事件优先级更高）
+  if (systemStatusMonitorEnabled) {
+    systemStatusMonitorEnabled = false;
+    console.log('📊 系统状态监控模式：已关闭（工具事件）');
+  }
+}
+
+// 处理系统状态更新（系统负载 → 颜色）
 function handleSystemStatus(data) {
   const { cpu, memory, gpu, performance_score, performance_level } = data;
   
+  // ✅ 颜色只由系统负载决定（不可覆盖）
   if (colorRenderer && performance_level) {
     colorRenderer.updateColor(performance_level);
   }
   
   updateStatusIndicator(cpu, memory);
+  
+  // 📊 如果开启了系统状态监控模式，实时更新气泡
+  if (systemStatusMonitorEnabled) {
+    const bubble = document.getElementById('speech-bubble');
+    const text = document.getElementById('bubble-text');
+    if (bubble && text && !bubble.classList.contains('hidden')) {
+      // 格式化状态信息
+      const statusText = `💻 CPU: ${cpu.toFixed(0)}% | 内存：${memory.toFixed(0)}% | ${performance_level}`;
+      text.textContent = statusText;
+      console.log(`📊 系统状态更新：${statusText}`);
+    }
+  }
 }
 function simulateSystemStatus() {
   const levels = ['空闲', '忙碌', '紧张', '夯爆了'];
@@ -942,6 +1030,62 @@ function triggerScheduledAction() {
         }
       }, 16);
       break;
+      
+    case 'nod':
+      // ========== 点头思考（适合无骨骼 GLB） ==========
+      let nodCount = 0;
+      const nodInterval = setInterval(() => {
+        nodCount++;
+        if (nodCount <= 6) {  // 3 次点头循环
+          // 低头
+          if (petWrapper) {
+            petWrapper.rotation.x = 0.3;
+          } else {
+            pet.rotation.x = 0.3;
+          }
+          setTimeout(() => {
+            // 抬头
+            if (petWrapper) {
+              petWrapper.rotation.x = -0.2;
+            } else {
+              pet.rotation.x = -0.2;
+            }
+          }, 150);
+        } else {
+          clearInterval(nodInterval);
+          if (petWrapper) {
+            petWrapper.rotation.x = 0;
+          } else {
+            pet.rotation.x = 0;
+          }
+          isActionInProgress = false;
+        }
+      }, 300);
+      break;
+      
+    case 'pulse':
+      // ========== 脉动（适合无骨骼 GLB） ==========
+      let pulseCount = 0;
+      const pulseInterval = setInterval(() => {
+        pulseCount++;
+        if (pulseCount <= 10) {  // 5 次脉动
+          const scale = 1 + Math.sin(pulseCount * 0.5) * 0.15;
+          if (petWrapper) {
+            petWrapper.scale.set(scale, scale, scale);
+          } else {
+            pet.scale.set(scale, scale, scale);
+          }
+        } else {
+          clearInterval(pulseInterval);
+          if (petWrapper) {
+            petWrapper.scale.set(1, 1, 1);
+          } else {
+            pet.scale.set(1, 1, 1);
+          }
+          isActionInProgress = false;
+        }
+      }, 150);
+      break;
   }
 }
 // ==================== 渲染循环 ====================
@@ -1013,4 +1157,28 @@ function animate() {
 }
 // 时钟（用于动画）
 const clock = new THREE.Clock();
+
+// ==================== 全局 API：动态修改模型颜色 ====================
+// 可以通过 window.setPetColor(colorHex) 来修改颜色
+window.setPetColor = function(colorHex, useFlatColor = true) {
+  if (modelLoader && pet) {
+    modelLoader.setColor(pet, colorHex, useFlatColor);
+    console.log('🎨 宠物颜色已修改为：', '#' + colorHex.toString(16).padStart(6, '0'));
+  } else {
+    console.warn('⚠️ 模型未加载，无法修改颜色');
+  }
+};
+
+// 获取当前颜色
+window.getPetColor = function() {
+  if (modelLoader) {
+    return modelLoader.getCurrentColor();
+  }
+  return null;
+};
+
+console.log('🦞 哈基虾颜色控制 API 已就绪：');
+console.log('  - window.setPetColor(0xFF4444)  // 设置颜色');
+console.log('  - window.getPetColor()          // 获取当前颜色');
+
 init();

@@ -799,6 +799,86 @@ class ParticleSystemManagerEnhanced {
   }
 }
 
+// ========== 代码雨特效（exec 工具专用） ==========
+class CodeRainParticle {
+  constructor(scene) {
+    this.scene = scene;
+    this.particleCount = 150;
+    this.birthTime = Date.now();
+    this.lifetime = 4000; // 4 秒
+    
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(this.particleCount * 3);
+    const colors = new Float32Array(this.particleCount * 3);
+    const sizes = new Float32Array(this.particleCount);
+    
+    // 代码字符颜色（白色、黄色、蓝色）
+    const codeColors = [
+      new THREE.Color(0xFFFFFF), // 白色
+      new THREE.Color(0xFFFF88), // 黄色
+      new THREE.Color(0x88CCFF), // 蓝色
+    ];
+    
+    for (let i = 0; i < this.particleCount; i++) {
+      // 随机分布在顶部
+      positions[i * 3] = (Math.random() - 0.5) * 10;     // x
+      positions[i * 3 + 1] = Math.random() * 8 + 2;       // y (顶部)
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 5;   // z
+      
+      const color = codeColors[Math.floor(Math.random() * codeColors.length)];
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+      
+      sizes[i] = Math.random() * 0.15 + 0.08;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 0.2,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+    });
+    
+    this.particleSystem = new THREE.Points(geometry, material);
+    this.scene.add(this.particleSystem);
+  }
+  
+  update(delta) {
+    const positions = this.particleSystem.geometry.attributes.position.array;
+    
+    for (let i = 0; i < this.particleCount; i++) {
+      // 下落
+      positions[i * 3 + 1] -= 0.08; // y 轴向下
+      
+      // 重置到顶部（循环）
+      if (positions[i * 3 + 1] < -2) {
+        positions[i * 3 + 1] = 8;
+        positions[i * 3] = (Math.random() - 0.5) * 10;
+      }
+    }
+    
+    this.particleSystem.geometry.attributes.position.needsUpdate = true;
+    
+    const age = Date.now() - this.birthTime;
+    const remaining = 1 - (age / this.lifetime);
+    this.particleSystem.material.opacity = remaining * 0.9;
+    
+    return true;
+  }
+  
+  dispose() {
+    this.scene.remove(this.particleSystem);
+    this.particleSystem.geometry.dispose();
+    this.particleSystem.material.dispose();
+  }
+}
+
 // ==================== 导出 ====================
 export {
   StarTrailParticle,
@@ -806,8 +886,9 @@ export {
   TrailParticle,
   ShockwaveParticle,
   ExpansionRing,
-  SparkParticle,  //
+  SparkParticle,
   AuraParticle,
   FloatingGlowParticle,
+  CodeRainParticle,  // 新增
   ParticleSystemManagerEnhanced
 };

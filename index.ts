@@ -226,23 +226,61 @@ export default function register(api: any) {
   startElectron(config);
   startPython();
   
-  // 监听 Gateway 事件
-  api.on?.('tool.call', (event: any) => {
-    // 发送事件到 Electron（通过进程间通信）
+  // ========== P0-Core 核心工具（所有用户可用）==========
+  const CORE_TOOLS: Record<string, { summary: string; action: string }> = {
+    read: { summary: '读文件中...', action: 'wiggle' },
+    write: { summary: '写代码中...', action: 'bounce' },
+    edit: { summary: '编辑代码中...', action: 'shake' },
+    exec: { summary: '执行命令...', action: 'stretch' },
+  };
+
+  // ========== P0-Optional 可选工具（需要配置）==========
+  const OPTIONAL_TOOLS: Record<string, { summary: string; action: string }> = {
+    web_fetch: { summary: '查资料中...', action: 'spiral' },
+    browser: { summary: '操作浏览器...', action: 'jump' },
+  };
+
+  // 合并工具映射
+  const TOOL_MAP = { ...CORE_TOOLS, ...OPTIONAL_TOOLS };
+
+  // 监听工具调用事件
+  api.on?.('tool.call', async (event: any) => {
+    // 只处理已映射的工具
+    const toolConfig = TOOL_MAP[event.tool];
+    if (!toolConfig) return;
+    
+    const toolEvent = {
+      type: 'tool.call',
+      tool: event.tool,
+      summary: toolConfig.summary,
+      action: toolConfig.action,
+      timestamp: Date.now(),
+    };
+    
     if (electronProcess) {
-      electronProcess.send?.({ type: 'tool.call', event });
+      electronProcess.send?.(toolEvent);
     }
   });
-  
+
+  // 监听会话开始
   api.on?.('session.start', (session: any) => {
     if (electronProcess) {
-      electronProcess.send?.({ type: 'session.start', session });
+      electronProcess.send?.({
+        type: 'session.start',
+        sessionId: session.id,
+        timestamp: Date.now(),
+      });
     }
   });
-  
+
+  // 监听会话结束
   api.on?.('session.end', (session: any) => {
     if (electronProcess) {
-      electronProcess.send?.({ type: 'session.end', session });
+      electronProcess.send?.({
+        type: 'session.end',
+        sessionId: session.id,
+        timestamp: Date.now(),
+      });
     }
   });
   

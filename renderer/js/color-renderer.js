@@ -25,7 +25,7 @@ class ColorRenderer {
   constructor(petParts) {
     this.petParts = petParts;
     this.currentLevel = '空闲';
-    this.currentColor = PERFORMANCE_COLORS[4]; // 默认浅蓝灰
+    this.currentColor = PERFORMANCE_COLORS[3]; // 默认浅蓝灰（索引 3 = 空闲）
   }
   
   /**

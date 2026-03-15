@@ -167,6 +167,15 @@ function createWindow() {
   });
 }
 
+// ========== 监听 Extension 进程的消息 ==========
+process.on('message', (message) => {
+  if (message && mainWindow) {
+    // 转发给前端（通过 WebContents）
+    mainWindow.webContents.send('gateway-event', message);
+    console.log('[IPC] Forwarded to renderer:', message.type);
+  }
+});
+
 // 启动 Python 后端
 function startPythonServer() {
   const serverPath = path.join(__dirname, '..', 'python', 'server.py');

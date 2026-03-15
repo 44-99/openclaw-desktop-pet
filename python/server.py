@@ -37,7 +37,6 @@ logging.getLogger('websockets').setLevel(logging.CRITICAL)
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from monitor import SystemMonitor
-from states import StateManager
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -66,7 +65,6 @@ class WebSocketServer:
         self.host = host
         self.port = port if port is not None else int(ENV.get('DEFAULT_PORT', 8765))
         self.monitor = SystemMonitor()
-        self.state_manager = StateManager()
         self.clients = set()
         # 注意：LLM 话题生成功能已由前端直接调用 OpenClaw Gateway API
         # Python 后端只负责系统监控（WebSocket 推送状态）
@@ -174,11 +172,9 @@ class WebSocketServer:
                     
                     # 收到消息后立即发送状态
                     system_data = self.monitor.get_all_data()
-                    state = self.state_manager.determine_state(system_data)
                     await websocket.send(json.dumps({
                         "type": "system_status",
-                        **system_data,
-                        "state": state
+                        **system_data
                     }))
                     last_status_time = current_time
                     
@@ -186,16 +182,12 @@ class WebSocketServer:
                     # 定时发送系统状态（每秒）
                     if current_time - last_status_time >= status_interval:
                         system_data = self.monitor.get_all_data()
-                        state = self.state_manager.determine_state(system_data)
                         
-                        # 发送常规状态
+                        # 发送常规状态（只发送 performance_level，不发送 state）
                         await websocket.send(json.dumps({
                             "type": "system_status",
-                            **system_data,
-                            "state": state
+                            **system_data
                         }))
-                        
-                        # 静默模式：不发送额外的内心戏触发通知
                         
                         last_status_time = current_time
                     continue
@@ -272,6 +264,11 @@ def main():
         logger.info("\nShutdown")
     except Exception as e:
         logger.error(f"[ERROR] {type(e).__name__}: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
         sys.exit(1)
 
 if __name__ == "__main__":

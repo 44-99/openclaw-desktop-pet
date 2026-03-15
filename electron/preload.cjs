@@ -35,4 +35,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // 检查是否有 Tavily API Key
   hasTavilyAPIKey: () => ipcRenderer.invoke('has-tavily-api-key'),
+  
+  // ========== Gateway 事件监听 ==========
+  // 监听 Gateway 工具调用事件
+  onGatewayEvent: (callback) => {
+    ipcRenderer.on('gateway-event', (event, message) => callback(message));
+  },
 });
