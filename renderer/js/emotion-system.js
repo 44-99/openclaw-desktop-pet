@@ -99,7 +99,6 @@ class EmotionState {
     this.startTime = Date.now();
     this.transitionProgress = 0; // 开始过渡
     
-    console.log(`🎭 Emotion: ${emotion} (${intensity}%) - ${trigger || 'manual'}`);
   }
   
   /**

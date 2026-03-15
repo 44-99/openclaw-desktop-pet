@@ -30,10 +30,8 @@ export class AnimationController {
         this.actions[cleanName] = action;
         this.availableAnimations.push(cleanName);
         
-        console.log(`🎬 加载动画：${cleanName} (原始名：${clip.name})`);
       });
       
-      console.log('✅ 可用动画列表:', this.availableAnimations);
     } else {
       console.warn('⚠️ 模型没有动画数据，请检查 GLB 导出设置');
     }
@@ -48,7 +46,6 @@ export class AnimationController {
   play(name, fadeIn = 0.3, loop = true) {
     if (!this.actions[name]) {
       console.warn(`⚠️ 动画不存在：${name}`);
-      console.log('📋 可用动画:', this.availableAnimations);
       return;
     }
 
@@ -76,7 +73,6 @@ export class AnimationController {
     newAction.play();
     
     this.currentAction = newAction;
-    console.log(`🎭 播放动画：${name} (循环：${loop})`);
   }
 
   /**
@@ -87,7 +83,6 @@ export class AnimationController {
     if (this.currentAction) {
       this.currentAction.fadeOut(fadeOut);
       this.currentAction = null;
-      console.log('⏹️ 停止动画');
     }
   }
 

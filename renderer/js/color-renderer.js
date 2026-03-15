@@ -9,8 +9,8 @@ import * as THREE from 'three';
 
 // 性能等级对应的颜色（4 级渐变 - 增强版，更鲜明）
 const PERFORMANCE_COLORS = [
-  0xFF0000,  // 夯爆了 (0-25 分) - 纯红色（更红）
-  0xFF69B4,  // 紧张 (26-50 分) - 热粉色（往粉色调靠）
+  0xFF0000,  // 夯爆了 (0-25 分) - 纯红色
+  0xFF8C00,  // 紧张 (26-50 分) - 深橙色
   0xFFE500,  // 忙碌 (51-75 分) - 亮黄色（更明亮）
   0x4A90E2,  // 空闲 (76-100 分) - 天蓝色（更蓝）
 ];
@@ -54,7 +54,6 @@ class ColorRenderer {
     const targetColor = this.getColorForLevel(level);
     this.currentColor = targetColor;
     
-    console.log(`🎨 颜色更新：${level} → ${this.colorToHex(targetColor)}`);
     
     // 更新龙虾身体颜色
     this.applyColor(targetColor);
@@ -67,7 +66,6 @@ class ColorRenderer {
   applyColor(color) {
     const targetColor = new THREE.Color(color);
     
-    console.log(`🎨 应用颜色：${this.colorToHex(color)}`);
     
     // 递归应用颜色到所有子对象
     const applyToMesh = (mesh) => {
@@ -87,7 +85,6 @@ class ColorRenderer {
     // 应用到整个模型（递归遍历所有 Mesh）
     applyToMesh(this.pet);
     
-    console.log('🎨 全身颜色更新完成');
   }
   
   /**

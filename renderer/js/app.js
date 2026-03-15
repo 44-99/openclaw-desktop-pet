@@ -518,7 +518,6 @@ function handleMenuAction(action) {
   // 📊 如果开启了系统状态监控，用户进行其他操作时关闭它
   if (systemStatusMonitorEnabled && action !== 'status') {
     systemStatusMonitorEnabled = false;
-    console.log('📊 系统状态监控模式：已关闭');
   }
   
   switch(action) {
@@ -535,7 +534,6 @@ function handleMenuAction(action) {
       // 立即显示当前状态
       showBubble(`💻 系统监控中... ${colorRenderer.currentLevel}`, false);
       
-      console.log('📊 系统状态监控模式：已开启');
       break;
     case 'openclaw':
       if (topicGenerator) {
@@ -593,13 +591,11 @@ function connectWebSocket() {
     }
     
     const port = ports[currentPortIndex];
-    console.log(`连接端口 ${port}...`);
     
     try {
       websocket = new WebSocket(`ws://localhost:${port}`);
       
       websocket.onopen = () => {
-        console.log(`✅ 连接成功 (${port})`);
         hideLoading();
       };
       
@@ -642,7 +638,6 @@ let systemStatusMonitorEnabled = false;  // 是否开启实时监控模式
 function handleToolCall(event) {
   const { tool, summary, action } = event;
   
-  console.log(`🔧 工具调用：${tool} - ${summary}`);
   
   // 1. 更新气泡（不消失，直到新工具到来）
   showBubble(summary, false);  // autoHide=false，气泡不自动消失
@@ -685,7 +680,6 @@ function handleToolCall(event) {
   // 8. 如果开启了系统状态监控，关闭它（工具事件优先级更高）
   if (systemStatusMonitorEnabled) {
     systemStatusMonitorEnabled = false;
-    console.log('📊 系统状态监控模式：已关闭（工具事件）');
   }
 }
 
@@ -708,7 +702,6 @@ function handleSystemStatus(data) {
       // 格式化状态信息
       const statusText = `💻 CPU: ${cpu.toFixed(0)}% | 内存：${memory.toFixed(0)}% | ${performance_level}`;
       text.textContent = statusText;
-      console.log(`📊 系统状态更新：${statusText}`);
     }
   }
 }
@@ -1050,7 +1043,6 @@ function triggerActionEffects(actionType, petPosition) {
   const effectIndex = Math.floor(Math.random() * availableEffects.length);
   const selectedEffect = availableEffects[effectIndex];
   
-  console.log(`✨ 动作 "${actionType}" 触发特效：${selectedEffect}`);
   
   //
   const effectMapping = {
@@ -1135,7 +1127,6 @@ const clock = new THREE.Clock();
 window.setPetColor = function(colorHex, useFlatColor = true) {
   if (modelLoader && pet) {
     modelLoader.setColor(pet, colorHex, useFlatColor);
-    console.log('🎨 宠物颜色已修改为：', '#' + colorHex.toString(16).padStart(6, '0'));
   } else {
     console.warn('⚠️ 模型未加载，无法修改颜色');
   }
@@ -1149,8 +1140,5 @@ window.getPetColor = function() {
   return null;
 };
 
-console.log('🦞 哈基虾颜色控制 API 已就绪：');
-console.log('  - window.setPetColor(0xFF4444)  // 设置颜色');
-console.log('  - window.getPetColor()          // 获取当前颜色');
 
 init();

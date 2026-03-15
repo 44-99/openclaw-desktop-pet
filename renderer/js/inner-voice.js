@@ -61,18 +61,15 @@ class InnerVoiceManager {
     if (timeSinceLastCheck < this.checkInterval) {
       // 每 5 秒打印一次倒计时
       if (timeSinceLastCheck % 5000 < 1000 && timeSinceLastCheck > 0) {
-        console.log(`💭 距离下次检查：${((this.checkInterval - timeSinceLastCheck) / 1000).toFixed(0)}秒`);
       }
       return;  // 还没到检查时间
     }
     
     // 重置检查计时器
     this.lastCheckTime = now;
-    console.log(`💭 检查时间点到达（间隔 ${timeSinceLastCheck/1000}秒）`);
     
     // 检查是否应该触发
     if (this.isWaitingResponse) {
-      console.log('💭 等待上一次回复，跳过本次检查');
       return;
     }
     
@@ -194,7 +191,6 @@ ${TONES[tone]}
     
     this.currentBubble = bubble;
     
-    console.log('💭 内心戏气泡显示:', text);
   }
   
   /**
@@ -218,7 +214,6 @@ ${TONES[tone]}
       }
       this.currentBubble = null;
       this.isShowing = false;
-      console.log('💭 内心戏气泡已移除');
     }, 1000); // 淡出动画 1 秒
   }
 }

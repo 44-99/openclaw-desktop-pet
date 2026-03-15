@@ -24,8 +24,6 @@ export class ModelLoader {
       this.loader.load(
         url,
         (gltf) => {
-          console.log('✅ 模型加载成功:', url);
-          console.log('📦 GLB 数据结构:', {
             scenes: gltf.scenes?.length,
             scene: gltf.scene,
             animations: gltf.animations?.length,
@@ -42,7 +40,6 @@ export class ModelLoader {
           // 加载进度回调
           if (progress.total > 0) {
             const percent = ((progress.loaded / progress.total) * 100).toFixed(1);
-            console.log(`📥 加载进度：${percent}%`);
           }
         },
         (error) => {
@@ -124,7 +121,6 @@ export class ModelLoader {
       this.currentColor = color;
     }
     
-    console.log('⚙️ 模型设置完成:', {
       scale: model.scale,
       position: model.position,
       rotation: model.rotation,
@@ -165,7 +161,6 @@ export class ModelLoader {
       }
     });
     
-    console.log('🎨 模型颜色已更新:', '#' + colorHex.toString(16).padStart(6, '0'));
   }
 
   /**
@@ -180,7 +175,6 @@ export class ModelLoader {
     
     // 这个功能需要更复杂的材质缓存机制
     // 简单版本：重新加载模型
-    console.log('🔄 恢复原始材质需要重新加载模型');
   }
 
   /**
