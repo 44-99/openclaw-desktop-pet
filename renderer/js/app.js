@@ -27,8 +27,6 @@ let websocket = null;
 let isRotating = false;
 let rotateStartX = 0, rotateStartY = 0;
 //
-let lastActionTime = 0;
-const ACTION_INTERVAL = 15000; //
 let isActionInProgress = false;
 //
 let cameraBaseZ = 5;
@@ -666,12 +664,12 @@ function handleToolCall(event) {
   // 5. 启动新动作循环
   if (action && !isActionInProgress) {
     // 立即执行一次
-    performAction(action);
+    executeSpecificAction(action);
     
     // 设置循环（每个动作完成后自动重播）
     toolActionInterval = setInterval(() => {
       if (!isActionInProgress) {
-        performAction(action);
+        executeSpecificAction(action);
       }
     }, 3000); // 3 秒检查一次
   }
@@ -714,6 +712,223 @@ function handleSystemStatus(data) {
     }
   }
 }
+
+// 执行特定动作（工具事件专用）
+function executeSpecificAction(actionName) {
+  if (!pet || isActionInProgress) return;
+  
+  isActionInProgress = true;
+  
+  // 触发对应的特效
+  triggerActionEffects(actionName, petWrapper ? petWrapper.position : pet.position);
+  
+  // 根据指定的动作执行
+  switch(actionName) {
+    case 'wiggle':
+      let wiggleProgress = 0;
+      const wiggleInterval = setInterval(() => {
+        wiggleProgress += 0.1;
+        if (wiggleProgress <= Math.PI * 4) {
+          const rotation = Math.sin(wiggleProgress) * 0.4;
+          if (petWrapper) {
+            petWrapper.rotation.z = rotation;
+          } else {
+            pet.rotation.z = rotation;
+          }
+        } else {
+          clearInterval(wiggleInterval);
+          if (petWrapper) petWrapper.rotation.z = 0;
+          else pet.rotation.z = 0;
+          isActionInProgress = false;
+        }
+      }, 16);
+      break;
+      
+    case 'bounce':
+      let bounceCount = 0;
+      const bounceInterval = setInterval(() => {
+        bounceCount++;
+        if (bounceCount <= 7) {
+          const jumpHeight = 0.6 * Math.pow(0.7, bounceCount);
+          let jumpProgress = 0;
+          const jumpInterval = setInterval(() => {
+            jumpProgress += 0.1;
+            if (jumpProgress <= Math.PI) {
+              if (petWrapper) {
+                petWrapper.position.y = Math.sin(jumpProgress) * jumpHeight;
+              } else {
+                pet.position.y = Math.sin(jumpProgress) * jumpHeight;
+              }
+            } else {
+              clearInterval(jumpInterval);
+            }
+          }, 16);
+        } else {
+          clearInterval(bounceInterval);
+          if (petWrapper) petWrapper.position.y = 0;
+          else pet.position.y = 0;
+          isActionInProgress = false;
+        }
+      }, 400);
+      break;
+      
+    case 'shake':
+      let shakeCount = 0;
+      const shakeInterval = setInterval(() => {
+        shakeCount++;
+        if (shakeCount <= 20) {
+          const offset = (Math.random() - 0.5) * 0.3;
+          if (petWrapper) {
+            petWrapper.position.x = offset;
+            petWrapper.rotation.y += (Math.random() - 0.5) * 0.2;
+          } else {
+            pet.position.x = offset;
+            pet.rotation.y += (Math.random() - 0.5) * 0.2;
+          }
+        } else {
+          clearInterval(shakeInterval);
+          if (petWrapper) {
+            petWrapper.position.x = 0;
+            petWrapper.rotation.y = 0;
+          } else {
+            pet.position.x = 0;
+            pet.rotation.y = 0;
+          }
+          isActionInProgress = false;
+        }
+      }, 30);
+      break;
+      
+    case 'stretch':
+      let stretchProgress = 0;
+      const initialScale = pet.scale.x;
+      const stretchInterval = setInterval(() => {
+        stretchProgress += 0.12;
+        if (stretchProgress <= Math.PI * 2) {
+          const stretch = Math.sin(stretchProgress) * 0.15;
+          const scaleY = initialScale * (1 - stretch);
+          const scaleXZ = initialScale * (1 + stretch * 0.6);
+          if (petWrapper) {
+            petWrapper.scale.set(scaleXZ, scaleY, scaleXZ);
+          } else {
+            pet.scale.set(scaleXZ, scaleY, scaleXZ);
+          }
+        } else {
+          clearInterval(stretchInterval);
+          if (petWrapper) {
+            petWrapper.scale.set(initialScale, initialScale, initialScale);
+          } else {
+            pet.scale.set(initialScale, initialScale, initialScale);
+          }
+          isActionInProgress = false;
+        }
+      }, 16);
+      break;
+      
+    case 'spiral':
+      let spiralProgress = 0;
+      const direction = Math.random() > 0.5 ? 1 : -1;
+      const spiralInterval = setInterval(() => {
+        spiralProgress += 0.06;
+        if (spiralProgress <= Math.PI * 6) {
+          const radius = 0.8;
+          const x = Math.cos(spiralProgress * direction) * radius;
+          const z = Math.sin(spiralProgress * direction) * radius;
+          const y = spiralProgress * 0.12;
+          if (petWrapper) {
+            petWrapper.position.set(x, y, z);
+            petWrapper.rotation.y = -spiralProgress * direction;
+          } else {
+            pet.position.set(x, y, z);
+            pet.rotation.y = -spiralProgress * direction;
+          }
+        } else {
+          clearInterval(spiralInterval);
+          if (petWrapper) {
+            petWrapper.position.set(0, 0, 0);
+            petWrapper.rotation.y = 0;
+          } else {
+            pet.position.set(0, 0, 0);
+            pet.rotation.y = 0;
+          }
+          isActionInProgress = false;
+        }
+      }, 16);
+      break;
+      
+    case 'jump':
+      let jumpProgress = 0;
+      const jumpInterval = setInterval(() => {
+        jumpProgress += 0.05;
+        if (jumpProgress <= Math.PI) {
+          if (petWrapper) {
+            petWrapper.position.y = Math.sin(jumpProgress) * 0.5;
+          } else {
+            pet.position.y = Math.sin(jumpProgress) * 0.5;
+          }
+        } else {
+          clearInterval(jumpInterval);
+          if (petWrapper) petWrapper.position.y = 0;
+          else pet.position.y = 0;
+          isActionInProgress = false;
+        }
+      }, 16);
+      break;
+      
+    case 'nod':
+      let nodCount = 0;
+      const nodInterval = setInterval(() => {
+        nodCount++;
+        if (nodCount <= 6) {
+          if (petWrapper) {
+            petWrapper.rotation.x = 0.3;
+          } else {
+            pet.rotation.x = 0.3;
+          }
+          setTimeout(() => {
+            if (petWrapper) {
+              petWrapper.rotation.x = -0.2;
+            } else {
+              pet.rotation.x = -0.2;
+            }
+          }, 150);
+        } else {
+          clearInterval(nodInterval);
+          if (petWrapper) {
+            petWrapper.rotation.x = 0;
+          } else {
+            pet.rotation.x = 0;
+          }
+          isActionInProgress = false;
+        }
+      }, 300);
+      break;
+      
+    case 'pulse':
+      let pulseCount = 0;
+      const pulseInterval = setInterval(() => {
+        pulseCount++;
+        if (pulseCount <= 10) {
+          const scale = 1 + Math.sin(pulseCount * 0.5) * 0.15;
+          if (petWrapper) {
+            petWrapper.scale.set(scale, scale, scale);
+          } else {
+            pet.scale.set(scale, scale, scale);
+          }
+        } else {
+          clearInterval(pulseInterval);
+          if (petWrapper) {
+            petWrapper.scale.set(1, 1, 1);
+          } else {
+            pet.scale.set(1, 1, 1);
+          }
+          isActionInProgress = false;
+        }
+      }, 150);
+      break;
+  }
+}
+
 function simulateSystemStatus() {
   const levels = ['空闲', '忙碌', '紧张', '夯爆了'];
   setInterval(() => {
@@ -850,244 +1065,6 @@ function triggerActionEffects(actionType, petPosition) {
   particleManager.triggerEffect(mappedEffect, petPosition);
 }
 // ==================== 定时动作触发器 ====================
-function triggerScheduledAction() {
-  if (!pet || isActionInProgress) return;
-  
-  //
-  const actions = ['wiggle', 'bounce', 'shake', 'stretch', 'spiral', 'jump'];
-  const action = actions[Math.floor(Math.random() * actions.length)];
-  
-  
-  isActionInProgress = true;
-  
-  //
-  triggerActionEffects(action, petWrapper ? petWrapper.position : pet.position);
-  
-  switch(action) {
-    case 'wiggle':
-      //
-      let wiggleProgress = 0;
-      const wiggleInterval = setInterval(() => {
-        wiggleProgress += 0.1;  // 速度减慢，时间更长
-        if (wiggleProgress <= Math.PI * 4) {  // 2 圈 → 4 圈，时间加倍
-          const rotation = Math.sin(wiggleProgress) * 0.4;
-          if (petWrapper) {
-            petWrapper.rotation.z = rotation;
-          } else {
-            pet.rotation.z = rotation;
-          }
-        } else {
-          clearInterval(wiggleInterval);
-          if (petWrapper) petWrapper.rotation.z = 0;
-          else pet.rotation.z = 0;
-          isActionInProgress = false;
-          
-        }
-      }, 16);
-      break;
-      
-    case 'bounce':
-      //
-      let bounceCount = 0;
-      const bounceInterval = setInterval(() => {
-        bounceCount++;
-        if (bounceCount <= 7) {  // 5 → 7 次
-          // 7 次弹跳，高度递减
-          const jumpHeight = 0.6 * Math.pow(0.7, bounceCount);
-          let jumpProgress = 0;
-          const jumpInterval = setInterval(() => {
-            jumpProgress += 0.1;
-            if (jumpProgress <= Math.PI) {
-              if (petWrapper) {
-                petWrapper.position.y = Math.sin(jumpProgress) * jumpHeight;
-              } else {
-                pet.position.y = Math.sin(jumpProgress) * jumpHeight;
-              }
-            } else {
-              clearInterval(jumpInterval);
-            }
-          }, 16);
-        } else {
-          clearInterval(bounceInterval);
-          if (petWrapper) petWrapper.position.y = 0;
-          else pet.position.y = 0;
-          isActionInProgress = false;
-          
-        }
-      }, 400);
-      break;
-      
-    case 'shake':
-      //
-      let shakeCount = 0;
-      const shakeInterval = setInterval(() => {
-        shakeCount++;
-        if (shakeCount <= 20) {  // 15 → 20 次
-          const offset = (Math.random() - 0.5) * 0.3;
-          if (petWrapper) {
-            petWrapper.position.x = offset;
-            petWrapper.rotation.y += (Math.random() - 0.5) * 0.2;
-          } else {
-            pet.position.x = offset;
-            pet.rotation.y += (Math.random() - 0.5) * 0.2;
-          }
-        } else {
-          clearInterval(shakeInterval);
-          if (petWrapper) {
-            petWrapper.position.x = 0;
-            petWrapper.rotation.y = 0;
-          } else {
-            pet.position.x = 0;
-            pet.rotation.y = 0;
-          }
-          isActionInProgress = false;
-          
-        }
-      }, 30);
-      break;
-      
-    case 'stretch':
-      //
-      let stretchProgress = 0;
-      const initialScale = pet.scale.x;
-      const stretchInterval = setInterval(() => {
-        stretchProgress += 0.12;
-        if (stretchProgress <= Math.PI * 2) {
-          const stretch = Math.sin(stretchProgress) * 0.15;  // 幅度减小，更自然
-          // 拉伸挤压：Y 轴压缩时 XZ 轴扩大（像真正的挤压）
-          // Y 轴拉长时 XZ 轴缩小（像真正的拉伸）
-          const scaleY = initialScale * (1 - stretch);  // Y 轴反向变化
-          const scaleXZ = initialScale * (1 + stretch * 0.6);  // XZ 轴正向变化，幅度减小
-          if (petWrapper) {
-            petWrapper.scale.set(scaleXZ, scaleY, scaleXZ);
-          } else {
-            pet.scale.set(scaleXZ, scaleY, scaleXZ);
-          }
-        } else {
-          clearInterval(stretchInterval);
-          if (petWrapper) {
-            petWrapper.scale.set(initialScale, initialScale, initialScale);
-          } else {
-            pet.scale.set(initialScale, initialScale, initialScale);
-          }
-          isActionInProgress = false;
-          
-        }
-      }, 16);
-      break;
-      
-    case 'spiral':
-      //
-      let spiralProgress = 0;
-      // 随机方向：1 = 顺时针，-1 = 逆时针
-      const direction = Math.random() > 0.5 ? 1 : -1;
-      const spiralInterval = setInterval(() => {
-        spiralProgress += 0.06;  // 速度稍慢，配合更多圈数
-        if (spiralProgress <= Math.PI * 6) {  // 4 圈 → 6 圈 = 1080°
-          const radius = 0.8;
-          const x = Math.cos(spiralProgress * direction) * radius;
-          const z = Math.sin(spiralProgress * direction) * radius;
-          const y = spiralProgress * 0.12;  // 高度增量稍减，配合更多圈数
-          if (petWrapper) {
-            petWrapper.position.set(x, y, z);
-            petWrapper.rotation.y = -spiralProgress * direction;
-          } else {
-            pet.position.set(x, y, z);
-            pet.rotation.y = -spiralProgress * direction;
-          }
-        } else {
-          clearInterval(spiralInterval);
-          if (petWrapper) {
-            petWrapper.position.set(0, 0, 0);
-            petWrapper.rotation.y = 0;
-          } else {
-            pet.position.set(0, 0, 0);
-            pet.rotation.y = 0;
-          }
-          isActionInProgress = false;
-          console.log(`✅ 螺旋上升完成（1080° ${direction > 0 ? '顺时针' : '逆时针'}）`);
-        }
-      }, 16);
-      break;
-      
-    case 'jump':
-      //
-      let jumpProgress = 0;
-      const jumpInterval = setInterval(() => {
-        jumpProgress += 0.05;
-        if (jumpProgress <= Math.PI) {
-          if (petWrapper) {
-            petWrapper.position.y = Math.sin(jumpProgress) * 0.5;
-          } else {
-            pet.position.y = Math.sin(jumpProgress) * 0.5;
-          }
-        } else {
-          clearInterval(jumpInterval);
-          if (petWrapper) petWrapper.position.y = 0;
-          else pet.position.y = 0;
-          isActionInProgress = false;
-          
-        }
-      }, 16);
-      break;
-      
-    case 'nod':
-      // ========== 点头思考（适合无骨骼 GLB） ==========
-      let nodCount = 0;
-      const nodInterval = setInterval(() => {
-        nodCount++;
-        if (nodCount <= 6) {  // 3 次点头循环
-          // 低头
-          if (petWrapper) {
-            petWrapper.rotation.x = 0.3;
-          } else {
-            pet.rotation.x = 0.3;
-          }
-          setTimeout(() => {
-            // 抬头
-            if (petWrapper) {
-              petWrapper.rotation.x = -0.2;
-            } else {
-              pet.rotation.x = -0.2;
-            }
-          }, 150);
-        } else {
-          clearInterval(nodInterval);
-          if (petWrapper) {
-            petWrapper.rotation.x = 0;
-          } else {
-            pet.rotation.x = 0;
-          }
-          isActionInProgress = false;
-        }
-      }, 300);
-      break;
-      
-    case 'pulse':
-      // ========== 脉动（适合无骨骼 GLB） ==========
-      let pulseCount = 0;
-      const pulseInterval = setInterval(() => {
-        pulseCount++;
-        if (pulseCount <= 10) {  // 5 次脉动
-          const scale = 1 + Math.sin(pulseCount * 0.5) * 0.15;
-          if (petWrapper) {
-            petWrapper.scale.set(scale, scale, scale);
-          } else {
-            pet.scale.set(scale, scale, scale);
-          }
-        } else {
-          clearInterval(pulseInterval);
-          if (petWrapper) {
-            petWrapper.scale.set(1, 1, 1);
-          } else {
-            pet.scale.set(1, 1, 1);
-          }
-          isActionInProgress = false;
-        }
-      }, 150);
-      break;
-  }
-}
 // ==================== 渲染循环 ====================
 function animate() {
   requestAnimationFrame(animate);
@@ -1097,11 +1074,6 @@ function animate() {
   const now = Date.now();
   
   if (pet) {
-    if (!isActionInProgress && now - lastActionTime > ACTION_INTERVAL) {
-      triggerScheduledAction();
-      lastActionTime = now;
-    }
-    
     if (animController && !isActionInProgress) {
       animController.update(delta);
     }
