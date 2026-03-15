@@ -68,16 +68,16 @@ class WebSocketServer:
         self.clients = set()
         # 注意：LLM 话题生成功能已由前端直接调用 OpenClaw Gateway API
         # Python 后端只负责系统监控（WebSocket 推送状态）
-    
+
     def is_port_in_use(self, port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             return s.connect_ex(('localhost', port)) == 0
-    
+
     def kill_process_on_port(self, port):
         """强制杀死占用端口的进程，并验证端口是否释放"""
         system = platform.system()
         killed_pids = []
-        
+
         try:
             if system == "Windows":
                 # Step 1: 查找占用端口的进程
@@ -89,7 +89,7 @@ class WebSocketServer:
                     encoding='utf-8',
                     errors='replace'
                 )
-                
+
                 if result.stdout:
                     logger.info(f"[Port {port}] Found processes:")
                     for line in result.stdout.strip().split('\n'):
@@ -106,13 +106,13 @@ class WebSocketServer:
                                         capture_output=True,
                                         text=True
                                     )
-                                    
+
                                     if kill_result.returncode == 0:
                                         logger.info(f"[Port {port}] ✅ Killed PID {pid}")
                                         killed_pids.append(pid)
                                     else:
                                         logger.warning(f"[Port {port}] ❌ Failed to kill PID {pid}: {kill_result.stderr}")
-                
+
                 # Step 3: 等待端口释放
                 if killed_pids:
                     logger.info(f"[Port {port}] Waiting for port to release...")
@@ -121,55 +121,54 @@ class WebSocketServer:
                         if not self.is_port_in_use(port):
                             logger.info(f"[Port {port}] ✅ Port released!")
                             return True
-                    
+
                     logger.warning(f"[Port {port}] ⚠️ Port still in use after killing processes")
                     return False
-                    
+
         except Exception as e:
             logger.error(f"[Port {port}] Error killing process: {e}")
-        
+
         return len(killed_pids) > 0
-    
+
     def find_available_port(self, start_port=8765, max_attempts=10):
         for port in range(start_port, start_port + max_attempts):
             if not self.is_port_in_use(port):
                 return port
         return None
-    
+
     async def generate_topic_with_llm(self, context='casual'):
         """此功能已废弃，话题生成由前端直接调用 OpenClaw Gateway API"""
         logger.warning("[WS] Topic generation requested, but LLM is disabled (use frontend API)")
         return None
 
-
     async def handler(self, websocket):
         self.clients.add(websocket)
         logger.info(f"[WS] Connected: {websocket.remote_address}")
-        
+
         try:
             await websocket.send(json.dumps({
                 "type": "init",
                 "message": "Hajixia server started",
                 "version": "0.1.0"
             }))
-            
+
             # 定时发送系统状态（每秒）
             last_status_time = 0
             status_interval = 1.0  # 秒
-            
+
             while True:
                 current_time = time.time()
-                
+
                 try:
                     # 尝试接收消息（非阻塞）
                     message = await asyncio.wait_for(websocket.recv(), timeout=0.1)
                     data = json.loads(message)
                     self.last_interaction_time = time.time()
-                    
+
                     # 处理心跳请求
                     if data.get('type') == 'ping':
                         await websocket.send(json.dumps({"type": "pong"}))
-                    
+
                     # 收到消息后立即发送状态
                     system_data = self.monitor.get_all_data()
                     await websocket.send(json.dumps({
@@ -177,18 +176,18 @@ class WebSocketServer:
                         **system_data
                     }))
                     last_status_time = current_time
-                    
+
                 except asyncio.TimeoutError:
                     # 定时发送系统状态（每秒）
                     if current_time - last_status_time >= status_interval:
                         system_data = self.monitor.get_all_data()
-                        
+
                         # 发送常规状态（只发送 performance_level，不发送 state）
                         await websocket.send(json.dumps({
                             "type": "system_status",
                             **system_data
                         }))
-                        
+
                         last_status_time = current_time
                     continue
                 except (EOFError, websockets.exceptions.InvalidMessage, websockets.exceptions.InvalidHandshake):
@@ -197,7 +196,7 @@ class WebSocketServer:
                 except json.JSONDecodeError:
                     # 非 JSON 消息，忽略
                     continue
-                
+
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"[WS] Disconnected")
         except websockets.exceptions.InvalidMessage:
@@ -205,20 +204,20 @@ class WebSocketServer:
             pass
         finally:
             self.clients.discard(websocket)
-    
+
     async def start(self):
         logger.info("[Hajixia] Starting...")
-        
+
         # Step 1: Try to kill existing process on default port (max 3 attempts)
         max_attempts = 3
         for attempt in range(max_attempts):
             if self.is_port_in_use(self.port):
                 logger.warning(f"[Attempt {attempt+1}/{max_attempts}] Port {self.port} in use!")
-                
+
                 if self.kill_process_on_port(self.port):
                     logger.info("[OK] Process killed, waiting for port to release...")
                     await asyncio.sleep(2)
-                    
+
                     # Verify port is actually free
                     if not self.is_port_in_use(self.port):
                         logger.info(f"[OK] Port {self.port} is now free!")
@@ -230,21 +229,21 @@ class WebSocketServer:
             else:
                 logger.info(f"[OK] Port {self.port} is available")
                 break
-        
+
         # Step 2: If port still in use, find alternative port
         if self.is_port_in_use(self.port):
             logger.warning(f"[WARN] Port {self.port} still busy after {max_attempts} attempts, finding alternative...")
             new_port = self.find_available_port(self.port + 1, max_attempts=20)
-            
+
             if new_port:
                 logger.info(f"[OK] Using alternative port: {new_port}")
                 self.port = new_port
             else:
                 logger.error(f"[ERROR] No available port found in range {self.port}-{self.port + 20}")
                 raise OSError(f"No available port in range {self.port}-{self.port + 20}")
-        
+
         logger.info(f"[WS] Listening: ws://{self.host}:{self.port}")
-        
+
         # 配置 websockets 服务器，禁用严格的 HTTP 检查以减少握手错误
         async with websockets.serve(
             self.handler, 

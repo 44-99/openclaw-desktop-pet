@@ -35,7 +35,7 @@ function httpPost(url, data) {
   return new Promise((resolve, reject) => {
     const jsonData = JSON.stringify(data);
     const parsedUrl = new URL(url);
-    
+
     // 明确使用 18789 端口
     const options = {
       hostname: '127.0.0.1',
@@ -54,13 +54,13 @@ function httpPost(url, data) {
       res.on('data', (chunk) => {
         responseBody += chunk;
       });
-      
+
       res.on('end', () => {
         if (!responseBody) {
           reject(new Error('Empty response'));
           return;
         }
-        
+
         try {
           const parsed = JSON.parse(responseBody);
           resolve(parsed);
@@ -76,12 +76,12 @@ function httpPost(url, data) {
       console.error('❌ HTTP 请求失败:', error.message);
       reject(error);
     });
-    
+
     req.setTimeout(10000, () => {
       req.destroy();
       reject(new Error('Request timeout'));
     });
-    
+
     req.write(jsonData);
     req.end();
     console.log('📤 请求已发送');
@@ -119,7 +119,7 @@ function getPythonCommand() {
 function loadGatewayToken() {
   try {
     const configPath = path.join(process.env.USERPROFILE, '.openclaw', 'openclaw.json');
-    
+
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       gatewayToken = config.gateway?.auth?.token;
@@ -152,12 +152,12 @@ function createWindow() {
       acceleratorWorksWhenHidden: false,
     },
   });
-  
+
   // 禁用开发者工具（生产模式）
   // mainWindow.webContents.openDevTools();
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  
+
   // 禁用开发者工具
   // mainWindow.webContents.openDevTools();
 
@@ -219,7 +219,7 @@ function startPythonServer() {
     console.error('❌ 启动 Python 后端失败:', err.message);
     console.error('请确保已安装 Python 3.10+ 并运行：pip install -r python/requirements.txt');
   });
-  
+
   console.log('✅ Python backend started');
 }
 
@@ -231,7 +231,7 @@ function createTray() {
   tray = new Tray(icon);
   tray.setTitle('Hajixia');
   tray.setToolTip('哈基虾桌面宠物 - 点击显示/隐藏');
-  
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: '显示',
@@ -266,30 +266,30 @@ function createTray() {
         try {
           const sessionsPath = path.join(os.homedir(), '.openclaw', 'agents', 'main', 'sessions');
           const sessionsFile = path.join(sessionsPath, 'sessions.json');
-          
+
           if (fs.existsSync(sessionsFile)) {
             const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf8'));
             let cleaned = false;
-            
+
             // 查找并删除桌面宠物会话
             for (const [key, value] of Object.entries(sessions)) {
               if (key.startsWith('agent:main:openai-user:desktop-pet:')) {
                 const sessionId = value.sessionId;
                 const transcriptFile = path.join(sessionsPath, `${sessionId}.jsonl`);
-                
+
                 // 删除转录文件
                 if (fs.existsSync(transcriptFile)) {
                   fs.unlinkSync(transcriptFile);
                   console.log(`🧹 清理转录文件：${sessionId}.jsonl`);
                 }
-                
+
                 // 删除会话条目
                 delete sessions[key];
                 cleaned = true;
                 console.log(`🧹 清理桌面宠物会话：${key}`);
               }
             }
-            
+
             // 保存更新后的 sessions.json
             if (cleaned) {
               fs.writeFileSync(sessionsFile, JSON.stringify(sessions, null, 2), 'utf8');
@@ -299,10 +299,10 @@ function createTray() {
         } catch (error) {
           console.error('❌ 清理会话失败:', error);
         }
-        
+
         // 退出应用
         console.log('🦞 收到退出请求，清理会话中...');
-        
+
         // 1. 先关闭 Python 后端
         if (pythonProcess) {
           console.log('🛑 停止 Python 后端...');
@@ -320,22 +320,22 @@ function createTray() {
           }
           pythonProcess = null;
         }
-        
+
         // 2. 关闭托盘
         if (tray) {
           tray.destroy();
           console.log('✅ 托盘已销毁');
         }
-        
+
         // 3. 退出应用
         console.log('👋 再见！');
         app.quit();
       }
     }
   ]);
-  
+
   tray.setContextMenu(contextMenu);
-  
+
   // 双击托盘图标显示/隐藏
   tray.on('double-click', () => {
     if (mainWindow) {
@@ -347,7 +347,7 @@ function createTray() {
       }
     }
   });
-  
+
   console.log('System tray created');
 }
 
@@ -355,11 +355,11 @@ function createTray() {
 app.whenReady().then(async () => {
   // 先加载网关 Token
   loadGatewayToken();
-  
+
   createWindow();
   startPythonServer();
   createTray(); // 创建系统托盘
-  
+
   // WebSocket 连接由前端 renderer 自行管理，主进程不需要连接
   console.log('ℹ️ Python WebSocket 将由前端 renderer 连接');
 
@@ -430,13 +430,13 @@ ipcMain.on('quit-app', () => {
   // 写入日志文件（因为窗口关闭后看不到控制台输出）
   const projectRoot = path.join(__dirname, '..');
   const logFile = path.join(projectRoot, 'cleanup.log');
-  
+
   // 确保目录存在
   const logDir = path.dirname(logFile);
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
-  
+
   const log = (msg) => {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
     const line = `[${timestamp}] ${msg}\n`;
@@ -449,32 +449,32 @@ ipcMain.on('quit-app', () => {
     // 同时打印到控制台（方便调试）
     console.log(msg);
   };
-  
+
   try {
     // 清理桌面宠物会话
     const sessionsPath = path.join(os.homedir(), '.openclaw', 'agents', 'main', 'sessions');
     const sessionsFile = path.join(sessionsPath, 'sessions.json');
-    
+
     if (fs.existsSync(sessionsFile)) {
       const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf8'));
       let cleaned = false;
-      
+
       for (const [key, value] of Object.entries(sessions)) {
         if (key.startsWith('agent:main:openai-user:desktop-pet:')) {
           const sessionId = value.sessionId;
           const transcriptFile = path.join(sessionsPath, `${sessionId}.jsonl`);
-          
+
           // 删除转录文件
           if (fs.existsSync(transcriptFile)) {
             fs.unlinkSync(transcriptFile);
           }
-          
+
           // 删除会话条目
           delete sessions[key];
           cleaned = true;
         }
       }
-      
+
       // 保存更新后的 sessions.json
       if (cleaned) {
         fs.writeFileSync(sessionsFile, JSON.stringify(sessions, null, 2), 'utf8');
@@ -484,7 +484,7 @@ ipcMain.on('quit-app', () => {
   } catch (error) {
     log('❌ 清理会话失败：' + error.message);
   }
-  
+
   // 1. 先关闭 Python 后端（仅在进程仍在运行时）
   if (pythonProcess && pythonProcess.exitCode === null) {
     try {
@@ -499,12 +499,12 @@ ipcMain.on('quit-app', () => {
     }
     pythonProcess = null;
   }
-  
+
   // 2. 关闭托盘
   if (tray) {
     tray.destroy();
   }
-  
+
   // 3. 退出应用
   app.quit();
 });
@@ -543,7 +543,7 @@ ipcMain.handle('get-window-position', () => {
 ipcMain.handle('send-to-openclaw', async (event, message, sessionKey) => {
   try {
     console.log('📝 话题生成请求:', sessionKey);
-    
+
     const data = await httpPost(`${OPENCLAW_GATEWAY_URL}/v1/chat/completions`, {
       model: 'openclaw:main',
       messages: [
@@ -558,17 +558,17 @@ ipcMain.handle('send-to-openclaw', async (event, message, sessionKey) => {
       ],
       user: sessionKey
     });
-    
+
     if (data.error) {
       return {
         success: false,
         error: data.error.message || 'Unknown error'
       };
     }
-    
+
     const reply = data.choices?.[0]?.message?.content || '(no response)';
     console.log('✅ OpenClaw reply:', reply);
-    
+
     return {
       success: true,
       reply: reply,
@@ -595,46 +595,46 @@ ipcMain.handle('get-memory-files', async () => {
     const os = require('os');
     const workspaceDir = path.join(os.homedir(), '.openclaw', 'workspace');
     const memoryDir = path.join(os.homedir(), '.openclaw', 'workspace', 'memory');
-    
+
     // 读取今日笔记
     const today = new Date().toISOString().split('T')[0];
     const todayPath = path.join(memoryDir, `${today}.md`);
-    
+
     let soul = '';
     let memory = '';
     let todayNote = '';
     let user = '';
     let identity = '';
-    
+
     // 读取 SOUL.md
     const soulPath = path.join(workspaceDir, 'SOUL.md');
     if (fs.existsSync(soulPath)) {
       soul = fs.readFileSync(soulPath, 'utf8');
     }
-    
+
     // 读取 MEMORY.md
     const memoryMdPath = path.join(workspaceDir, 'MEMORY.md');
     if (fs.existsSync(memoryMdPath)) {
       memory = fs.readFileSync(memoryMdPath, 'utf8');
     }
-    
+
     // 读取今日笔记
     if (fs.existsSync(todayPath)) {
       todayNote = fs.readFileSync(todayPath, 'utf8').substring(0, 200);
     }
-    
+
     // 读取 USER.md
     const userPath = path.join(workspaceDir, 'USER.md');
     if (fs.existsSync(userPath)) {
       user = fs.readFileSync(userPath, 'utf8');
     }
-    
+
     // 读取 IDENTITY.md
     const identityPath = path.join(workspaceDir, 'IDENTITY.md');
     if (fs.existsSync(identityPath)) {
       identity = fs.readFileSync(identityPath, 'utf8');
     }
-    
+
     return { soul, memory, today: todayNote, user, identity };
   } catch (error) {
     console.error('❌ 读取记忆文件失败:', error);
@@ -658,11 +658,11 @@ ipcMain.handle('delete-pending-topic', async (event, sessionKey) => {
     console.log(`🗑️ 删除待处理话题：${sessionKey}`);
     const sessionsPath = path.join(os.homedir(), '.openclaw', 'agents', 'main', 'sessions');
     const sessionsFile = path.join(sessionsPath, 'sessions.json');
-    
+
     if (fs.existsSync(sessionsFile)) {
       const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf8'));
       console.log('📂 当前会话数:', Object.keys(sessions).length);
-      
+
       // 尝试两种格式匹配（兼容旧格式和新格式）
       let actualKey = sessionKey;
       if (!sessions[sessionKey] && sessionKey.startsWith('desktop-pet:')) {
@@ -670,18 +670,18 @@ ipcMain.handle('delete-pending-topic', async (event, sessionKey) => {
         actualKey = `agent:main:openai-user:${sessionKey}`;
         console.log(`🔍 尝试匹配完整格式：${actualKey}`);
       }
-      
+
       // 找到桌面宠物会话
       if (sessions[actualKey]) {
         const sessionId = sessions[actualKey].sessionId;
         const transcriptFile = path.join(sessionsPath, `${sessionId}.jsonl`);
-        
+
         // 1. 删除转录文件
         if (fs.existsSync(transcriptFile)) {
           fs.unlinkSync(transcriptFile);
           console.log(`📄 已删除转录文件：${sessionId}.jsonl`);
         }
-        
+
         // 2. 删除所有 .deleted 备份文件
         const deletedFiles = fs.readdirSync(sessionsPath)
           .filter(f => f.startsWith(sessionId + '.jsonl.deleted.'));
@@ -689,16 +689,16 @@ ipcMain.handle('delete-pending-topic', async (event, sessionKey) => {
           fs.unlinkSync(path.join(sessionsPath, f));
           console.log(`🗑️ 已删除备份：${f}`);
         });
-        
+
         // 3. 从 sessions.json 中删除该会话条目
         delete sessions[actualKey];
         fs.writeFileSync(sessionsFile, JSON.stringify(sessions, null, 2), 'utf8');
         console.log(`✅ 已彻底删除会话：${actualKey}`);
-        
+
         return { success: true };
       }
     }
-    
+
     console.log(`ℹ️ 会话不存在（无需删除）: ${sessionKey}`);
     return { success: true };  // 不存在也视为成功（已经是空的）
   } catch (error) {
@@ -718,12 +718,12 @@ ipcMain.handle('open-desktop-pet-session', async (event, sessionKey) => {
       actualKey = `agent:main:openai-user:${sessionKey}`;
       console.log(`🔑 会话 Key 转换：${sessionKey} → ${actualKey}`);
     }
-    
+
     const url = `http://127.0.0.1:18789/?session=${encodeURIComponent(actualKey)}`;
-    
+
     shell.openExternal(url);
     console.log('🚀 打开桌面宠物会话:', url);
-    
+
     return { success: true };
   } catch (error) {
     console.error('❌ 打开会话失败:', error);
@@ -737,7 +737,7 @@ ipcMain.handle('has-tavily-api-key', async () => {
     // OpenClaw 项目级 .env 文件路径
     const envPath = path.join(os.homedir(), '.openclaw', '.env');
     let hasKey = false;
-    
+
     // 检查 .env 文件是否存在
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf-8');
@@ -746,7 +746,7 @@ ipcMain.handle('has-tavily-api-key', async () => {
     } else {
       console.log('⚠️ .env 文件不存在:', envPath);
     }
-    
+
     // 也检查环境变量
     if (!hasKey && process.env.TAVILY_API_KEY) {
       hasKey = true;

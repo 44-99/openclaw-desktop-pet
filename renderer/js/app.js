@@ -10,78 +10,59 @@ import { ModelLoader } from './model-loader.js';
 import { AnimationController } from './animation-controller.js';
 // ==================== 导入增强粒子系统 ====================
 import { ParticleSystemManagerEnhanced, CodeRainParticle } from './particle-system-enhanced.js';
-// ==================== 全局变量 ====================
+// 全局变量
 let scene, camera, renderer, pet;
 let petParts = {};
-let animController = null; //
-let modelLoader = null;    //
-// 模块实例
+let animController = null;
+let modelLoader = null;
 let colorRenderer = null;
 let emotionSystem = null;
 let particleManager = null;
 let innerVoiceManager = null;
 let topicGenerator = null;
-// WebSocket
 let websocket = null;
-// 鼠标控制
 let isRotating = false;
 let rotateStartX = 0, rotateStartY = 0;
-//
 let isActionInProgress = false;
-//
 let cameraBaseZ = 5;
 let cameraFloatOffset = 0;
 let cameraFloatTime = 0;
-//
 let petWrapper = null;
 // ==================== 加载 GLB 模型（替换手搓龙虾） ====================
 async function loadGLBModel() {
   modelLoader = new ModelLoader();
   try {
-    // 加载 GLB 文件
     const gltf = await modelLoader.load('models/gray_wolf.glb');
     
-    //
     petWrapper = new THREE.Group();
     
-    // 设置模型属性（带颜色覆盖）
     pet = modelLoader.setup(gltf, {
-      scale: 2,        // 根据实际大小调整
+      scale: 2,
       position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: -Math.PI / 2, z: 0 },
       color: 0xB0C4DE,  // 默认浅蓝色（系统空闲状态颜色）
-      useFlatColor: true  // 使用纯色覆盖（即使模型有纹理）
+      useFlatColor: true
     });
     
-    //
     petWrapper.add(pet);
     scene.add(petWrapper);
     
-    //
     animController = new AnimationController(gltf, pet);
     
-    // 播放第一个可用动画（通常是 idle）
+    // 播放 idle 动画
     const animations = animController.getAvailableAnimations();
     if (animations.length > 0) {
-      // 优先播放 idle 动画
       if (animations.includes('idle')) {
         animController.play('idle');
       } else {
-        animController.play(animations[0]); // 播放第一个动画
+        animController.play(animations[0]);
       }
     }
     
-    
-    
-    //
     if (particleManager) {
       particleManager.triggerEffect('idle', petWrapper.position);
     }
-    
   } catch (error) {
-    
-    
-    // Fallback：使用原来的手搓龙虾
     createPetFallback();
   }
 }

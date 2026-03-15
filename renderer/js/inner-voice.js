@@ -32,13 +32,13 @@ class InnerVoiceManager {
   constructor(options) {
     this.sendToOpenClaw = options.sendToOpenClaw;
     this.showBubble = options.showBubble;
-    
+
     // 当前气泡元素
     this.currentBubble = null;
-    
+
     // 防抖：是否正在显示
     this.isShowing = false;
-    
+
     // ========== 状态管理 ==========
     this.lastCheckTime = Date.now();  // 上次检查时间
     this.lastTriggerTime = 0;         // 上次触发时间
@@ -48,14 +48,14 @@ class InnerVoiceManager {
     this.lastLevel = null;            // 上次等级
     this.lastScore = 100;             // 上次评分
   }
-  
+
   /**
    * 每秒接收性能数据（但不一定触发）
    * @param {object} data - 性能数据
    */
   onPerformanceUpdate(data) {
     const now = Date.now();
-    
+
     // 检查是否到达检查时间（每 20 秒）
     const timeSinceLastCheck = now - this.lastCheckTime;
     if (timeSinceLastCheck < this.checkInterval) {
@@ -64,25 +64,25 @@ class InnerVoiceManager {
       }
       return;  // 还没到检查时间
     }
-    
+
     // 重置检查计时器
     this.lastCheckTime = now;
-    
+
     // 检查是否应该触发
     if (this.isWaitingResponse) {
       return;
     }
-    
+
     // 检查等级是否变化，或者固定时间间隔触发（1 小时）
     const timeSinceLastTrigger = now - this.lastTriggerTime;
     const shouldTriggerByLevel = this.lastLevel !== null && data.performance_level !== this.lastLevel;
     const shouldTriggerByTime = timeSinceLastTrigger > this.triggerInterval; // 1 小时强制触发一次
-    
+
     if (shouldTriggerByLevel || shouldTriggerByTime) {
       this.lastLevel = data.performance_level;
       this.lastScore = data.performance_score;
       this.isWaitingResponse = true;
-      
+
       this.generateInnerVoice(data);
     } else {
       if (this.lastLevel === null) {
@@ -92,7 +92,7 @@ class InnerVoiceManager {
       // 静默模式，不打印日志
     }
   }
-  
+
   /**
    * 生成内心戏（静默模式，减少日志）
    * @param {object} data - 性能数据
@@ -104,21 +104,21 @@ class InnerVoiceManager {
     const memory = data.memory || 0;
     const gpu = data.gpu || 0;
     const gpu_temp = data.gpu_temp || 0;
-    
+
     // 随机选择语气
     const tone = TONES[Math.floor(Math.random() * TONES.length)];
-    
+
     // 构建 Prompt
     const prompt = this.buildPrompt(tone, level, score, cpu, memory, gpu, gpu_temp);
-    
+
     // 调用 OpenClaw 生成内心戏
     try {
       const result = await this.sendToOpenClaw(prompt);
-      
+
       if (result.success) {
         // 显示内心戏气泡（头顶位置）
         this.showInnerVoiceBubble(result.reply);
-        
+
         // 10 秒后淡出
         setTimeout(() => {
           this.fadeOutBubble();
@@ -134,7 +134,7 @@ class InnerVoiceManager {
       this.lastTriggerTime = Date.now();
     }
   }
-  
+
   /**
    * 构建内心戏 Prompt
    */
@@ -167,7 +167,7 @@ ${TONES[tone]}
 
 请生成内心戏：`;
   }
-  
+
   /**
    * 显示内心戏气泡（头顶位置）
    * @param {string} text - 气泡文本
@@ -181,18 +181,18 @@ ${TONES[tone]}
       <div class="inner-voice-text">${text}</div>
       <div class="inner-voice-arrow"></div>
     `;
-    
+
     // 添加到页面
     document.getElementById('canvas-container').appendChild(bubble);
-    
+
     // 强制重绘，触发动画
     bubble.offsetHeight;
     bubble.classList.add('visible');
-    
+
     this.currentBubble = bubble;
-    
+
   }
-  
+
   /**
    * 淡出气泡
    */
@@ -200,13 +200,13 @@ ${TONES[tone]}
     if (!this.currentBubble) {
       return;
     }
-    
+
     const bubble = this.currentBubble;
-    
+
     // 添加淡出类
     bubble.classList.remove('visible');
     bubble.classList.add('fade-out');
-    
+
     // 动画结束后移除
     setTimeout(() => {
       if (bubble.parentNode) {
@@ -218,5 +218,4 @@ ${TONES[tone]}
   }
 }
 
-// 导出
 export { InnerVoiceManager, TONES };

@@ -8,38 +8,38 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 
 class SystemMonitor:
     """系统监控器"""
-    
+
     # 性能等级名称（4 级）
     LEVEL_NAMES = ['空闲', '忙碌', '紧张', '夯爆了']
-    
+
     # 基准线（正常使用范围，用于调分）- 降低门槛，更容易触发"夯爆了"
     CPU_BASE = 35      # CPU 空闲时约 5-15%，正常 25-45% → 提高基准，更容易扣分
     MEM_BASE = 45      # 内存空闲时约 25-45% → 提高基准，更容易扣分
     GPU_BASE = 20      # GPU 空闲时约 5-15% → 提高基准，更容易扣分
     TEMP_BASE = 50     # GPU 温度空闲时约 35-45°C → 提高基准，更容易扣分
-    
+
     def __init__(self):
         self.system = platform.system()
         self.last_net = psutil.net_io_counters()
         self.last_score = 100
         self.last_level = '空闲'
         self.last_level_change_time = time.time()
-    
+
     def get_cpu_percent(self):
         """获取 CPU 使用率"""
         return psutil.cpu_percent(interval=0.5)
-    
+
     def get_memory_percent(self):
         """获取内存使用率"""
         return psutil.virtual_memory().percent
-    
+
     def get_disk_percent(self):
         """获取磁盘使用率"""
         try:
             return psutil.disk_usage('/').percent
         except:
             return psutil.disk_usage('C:\\').percent
-    
+
     def get_network_speed(self):
         """获取网络速度（字节/秒）"""
         try:
@@ -53,7 +53,7 @@ class SystemMonitor:
             }
         except:
             return {"upload": 0, "download": 0}
-    
+
     def get_gpu_percent(self):
         """获取 GPU 使用率"""
         try:
@@ -75,7 +75,7 @@ class SystemMonitor:
                 return 0
         except:
             return 0
-    
+
     def get_gpu_temperature(self):
         """获取 GPU 温度"""
         try:
@@ -97,7 +97,7 @@ class SystemMonitor:
                 return 0
         except:
             return 0
-    
+
     def calculate_score(self, cpu, memory, gpu, gpu_temp):
         """
         计算性能综合评分（0-100）
@@ -108,10 +108,10 @@ class SystemMonitor:
         mem_score = max(0, 100 - (memory - self.MEM_BASE) * 2.0)
         gpu_score = max(0, 100 - (gpu - self.GPU_BASE) * 2.0)
         temp_score = max(0, 100 - (gpu_temp - self.TEMP_BASE) * 2.5)
-        
+
         # 统计"危险指标"数量（单项评分 < 40 表示该指标已接近瓶颈）
         critical_count = sum(1 for s in [cpu_score, mem_score, gpu_score, temp_score] if s < 40)
-        
+
         # 木桶效应：短板惩罚
         # 如果有 2 个以上指标接近瓶颈，直接大幅扣分
         if critical_count >= 3:
@@ -125,16 +125,16 @@ class SystemMonitor:
             penalty = 10
         else:
             penalty = 0
-        
+
         # 加权平均（CPU 和内存权重更高）
         base_score = (cpu_score * 0.35 + mem_score * 0.35 + 
                       gpu_score * 0.15 + temp_score * 0.15)
-        
+
         # 应用短板惩罚
         score = base_score - penalty
-        
+
         return max(0, min(100, score))
-    
+
     def get_level(self, score):
         """
         根据分数获取性能等级（4 级）
@@ -151,14 +151,14 @@ class SystemMonitor:
             return '紧张'
         else:
             return '夯爆了'
-    
+
     def get_level_index(self, level):
         """获取等级索引（用于颜色映射）"""
         try:
             return self.LEVEL_NAMES.index(level)
         except ValueError:
             return 4  # 默认空闲
-    
+
     def get_all_data(self):
         """获取所有系统数据"""
         net = self.get_network_speed()
@@ -166,11 +166,11 @@ class SystemMonitor:
         memory = self.get_memory_percent()
         gpu = self.get_gpu_percent()
         gpu_temp = self.get_gpu_temperature()
-        
+
         # 计算性能评分
         score = self.calculate_score(cpu, memory, gpu, gpu_temp)
         level = self.get_level(score)
-        
+
         # 检查等级是否变化
         level_changed = (level != self.last_level)
         if level_changed:
@@ -179,7 +179,7 @@ class SystemMonitor:
             self.last_level_change_time = time.time()
         else:
             self.last_score = score
-        
+
         return {
             "cpu": cpu,
             "memory": memory,

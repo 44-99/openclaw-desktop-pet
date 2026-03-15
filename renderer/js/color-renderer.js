@@ -1,117 +1,68 @@
 /**
- * 哈基虾颜色渲染器
- * 
- * 根据性能评分渲染龙虾身体颜色
- * 5 级渐变：浅蓝灰 → 淡蓝 → 橙黄 → 橙红 → 亮红
+ * 哈基虾颜色渲染器 - 根据系统负载渲染模型颜色
  */
 
 import * as THREE from 'three';
 
-// 性能等级对应的颜色（4 级渐变 - 增强版，更鲜明）
 const PERFORMANCE_COLORS = [
-  0xFF0000,  // 夯爆了 (0-25 分) - 纯红色
-  0xFF8C00,  // 紧张 (26-50 分) - 深橙色
-  0xFFE500,  // 忙碌 (51-75 分) - 亮黄色（更明亮）
-  0x4A90E2,  // 空闲 (76-100 分) - 天蓝色（更蓝）
+  0xFF0000,  // 夯爆了 (0-25 分)
+  0xFF8C00,  // 紧张 (26-50 分)
+  0xFFE500,  // 忙碌 (51-75 分)
+  0x4A90E2,  // 空闲 (76-100 分)
 ];
 
-// 性能等级名称（4 级）
 const LEVEL_NAMES = ['夯爆了', '紧张', '忙碌', '空闲'];
 
 class ColorRenderer {
-  /**
-   * @param {THREE.Group} pet - 宠物模型引用（可以是 pet 或 petWrapper）
-   */
   constructor(pet) {
     this.pet = pet;
     this.currentLevel = '空闲';
-    this.currentColor = PERFORMANCE_COLORS[3]; // 默认浅蓝灰（索引 3 = 空闲）
+    this.currentColor = PERFORMANCE_COLORS[3];
   }
   
-  /**
-   * 根据性能等级获取颜色
-   * @param {string} level - 性能等级名称
-   * @returns {number} 颜色值（hex）
-   */
   getColorForLevel(level) {
     const index = LEVEL_NAMES.indexOf(level);
-    if (index === -1) {
-      return PERFORMANCE_COLORS[4]; // 默认空闲
-    }
+    if (index === -1) return PERFORMANCE_COLORS[4];
     return PERFORMANCE_COLORS[index];
   }
   
-  /**
-   * 更新颜色
-   * @param {string} level - 性能等级
-   */
   updateColor(level) {
-    if (level === this.currentLevel) {
-      return; // 等级未变化，不更新
-    }
+    if (level === this.currentLevel) return;
     
     this.currentLevel = level;
     const targetColor = this.getColorForLevel(level);
     this.currentColor = targetColor;
-    
-    
-    // 更新龙虾身体颜色
     this.applyColor(targetColor);
   }
   
-  /**
-   * 应用颜色到模型（递归遍历所有 Mesh）
-   * @param {number} color - 颜色值（hex）
-   */
   applyColor(color) {
     const targetColor = new THREE.Color(color);
-    
-    
-    // 递归应用颜色到所有子对象
     const applyToMesh = (mesh) => {
       if (!mesh) return;
-      
-      if (mesh.material) {
-        // 所有部位使用相同颜色，不交替
+      if (mesh.material && mesh.material.color) {
         mesh.material.color.lerp(targetColor, 0.9);
       }
-      
-      // 递归处理子对象
       if (mesh.children) {
         mesh.children.forEach(child => applyToMesh(child));
       }
     };
-    
-    // 应用到整个模型（递归遍历所有 Mesh）
     applyToMesh(this.pet);
-    
   }
   
-  /**
-   * 颜色值转十六进制字符串
-   * @param {number} color - 颜色值（hex）
-   * @returns {string} 十六进制字符串
-   */
+
   colorToHex(color) {
     return '#' + color.toString(16).padStart(6, '0').toUpperCase();
   }
   
-  /**
-   * 获取当前等级
-   * @returns {string} 当前等级名称
-   */
+
   getCurrentLevel() {
     return this.currentLevel;
   }
   
-  /**
-   * 获取当前颜色
-   * @returns {number} 当前颜色值（hex）
-   */
+
   getCurrentColor() {
     return this.currentColor;
   }
 }
 
-// 导出
 export { ColorRenderer, PERFORMANCE_COLORS, LEVEL_NAMES };

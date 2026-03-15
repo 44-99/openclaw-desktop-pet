@@ -10,9 +10,9 @@
 
 // ========== 情绪类型定义 ==========
 const EMOTION_TYPES = {
-  HAPPY: 'happy',      // 开心
-  IDLE: 'idle',        // 悠闲
-  SLEEPY: 'sleepy',    // 困倦
+  HAPPY: 'happy',
+  IDLE: 'idle',
+  SLEEPY: 'sleepy',
 };
 
 // ========== 情绪配置表 ==========
@@ -27,7 +27,7 @@ const EXPRESSION_CONFIG = {
     floatSpeed: 1.3,         // 漂浮速度加快
     antennaSpeed: 0.08,      // 触角摆动加快
   },
-  
+
   [EMOTION_TYPES.IDLE]: {
     eyeScale: 1.0,           // 正常眼睛
     eyeY: 0.3,               // 眼睛位置正常
@@ -38,7 +38,7 @@ const EXPRESSION_CONFIG = {
     floatSpeed: 1.0,         // 漂浮速度正常
     antennaSpeed: 0.03,      // 触角摆动缓慢
   },
-  
+
   [EMOTION_TYPES.SLEEPY]: {
     eyeScale: 0.5,           // 眼睛半闭
     eyeY: 0.2,               // 眼睛位置下降
@@ -56,29 +56,29 @@ class EmotionState {
   constructor() {
     // 当前主导情绪
     this.currentEmotion = EMOTION_TYPES.IDLE;
-    
+
     // 目标情绪（用于平滑过渡）
     this.targetEmotion = EMOTION_TYPES.IDLE;
-    
+
     // 情绪强度（0-100）
     this.intensity = 50;
-    
+
     // 情绪持续时间（毫秒）
     this.duration = 0;
-    
+
     // 情绪开始时间
     this.startTime = Date.now();
-    
+
     // 情绪衰减率（每秒减少的强度）
     this.decayRate = 3;
-    
+
     // 情绪过渡进度（0-1，用于平滑动画）
     this.transitionProgress = 1;
-    
+
     // 情绪触发源（用于调试）
     this.trigger = null;
   }
-  
+
   /**
    * 设置情绪
    * @param {string} emotion - 情绪类型 (happy/idle/sleepy)
@@ -91,16 +91,16 @@ class EmotionState {
       console.warn('Unknown emotion:', emotion);
       return;
     }
-    
+
     this.targetEmotion = emotion;
     this.intensity = intensity;
     this.duration = duration;
     this.trigger = trigger;
     this.startTime = Date.now();
     this.transitionProgress = 0; // 开始过渡
-    
+
   }
-  
+
   /**
    * 更新情绪状态（每帧调用）
    * @param {number} deltaTime - 距离上一帧的时间（毫秒）
@@ -111,27 +111,27 @@ class EmotionState {
       this.transitionProgress += deltaTime / 500; // 500ms 过渡
       this.transitionProgress = Math.min(1, this.transitionProgress);
     }
-    
+
     // 衰减情绪强度
     if (this.duration > 0) {
       this.intensity -= this.decayRate * (deltaTime / 1000);
       this.intensity = Math.max(0, this.intensity);
-      
+
       // 检查是否超时
       if (Date.now() - this.startTime > this.duration) {
         this.intensity = 0;
       }
     }
-    
+
     // 情绪结束后回到空闲状态
     if (this.intensity === 0 && this.currentEmotion !== EMOTION_TYPES.IDLE) {
       this.set(EMOTION_TYPES.IDLE, 50, 0, 'timeout');
     }
-    
+
     // 更新当前情绪（使用过渡进度混合）
     this.currentEmotion = this.targetEmotion;
   }
-  
+
   /**
    * 获取当前表情的混合配置（支持平滑过渡）
    * @param {THREE.Group} petParts - 宠物组件引用
@@ -139,10 +139,10 @@ class EmotionState {
    */
   getBlendedConfig(petParts) {
     const config = EXPRESSION_CONFIG[this.currentEmotion];
-    
+
     // 根据强度调整表情
     const intensityFactor = this.intensity / 100;
-    
+
     return {
       eyeScale: config.eyeScale,
       eyeY: config.eyeY,
@@ -154,13 +154,13 @@ class EmotionState {
       antennaSpeed: config.antennaSpeed * intensityFactor,
     };
   }
-  
+
   /**
    * 根据时间自动调整情绪
    */
   autoAdjustByTime() {
     const hour = new Date().getHours();
-    
+
     // 深夜（23 点 -5 点）：困倦
     if (hour >= 23 || hour <= 5) {
       if (this.currentEmotion !== EMOTION_TYPES.SLEEPY) {
@@ -186,14 +186,14 @@ class EmotionState {
 class EmotionTrigger {
   constructor(emotionSystem) {
     this.emotionSystem = emotionSystem;
-    
+
     // 触发词映射
     this.triggerWords = {
       [EMOTION_TYPES.HAPPY]: ['哈哈', '好笑', '有趣', '喜欢', '棒', '厉害', '聪明', '可爱'],
       [EMOTION_TYPES.SLEEPY]: ['困', '累', '睡', '休息', '晚安'],
     };
   }
-  
+
   /**
    * 分析用户消息并触发情绪
    * @param {string} message - 用户消息
@@ -206,11 +206,11 @@ class EmotionTrigger {
         return;
       }
     }
-    
+
     // 检测时间（自动调整）
     this.emotionSystem.autoAdjustByTime();
   }
-  
+
   /**
    * 触发情绪
    * @param {string} emotion - 情绪类型

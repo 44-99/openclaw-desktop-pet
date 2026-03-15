@@ -10,8 +10,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export class ModelLoader {
   constructor() {
     this.loader = new GLTFLoader();
-    this.currentColor = 0xB0C4DE; // 默认浅蓝色（系统空闲状态颜色）
-    this.materialsCache = []; // 缓存原始材质，用于恢复
+    this.currentColor = 0xB0C4DE;  // 默认浅蓝色
+    this.materialsCache = [];
   }
 
   /**
