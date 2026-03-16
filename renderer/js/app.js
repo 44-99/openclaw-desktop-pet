@@ -417,21 +417,22 @@ function setupMouseControls() {
         if (topicGenerator) {
           //
           if (topicGenerator.isBusy()) {
-            // 安抚用户（不自动隐藏，防止消失后用户更急）
             showBubble('别急嘛，正在努力思考中～🤔', false);
             return;
           }
-          
-          //
           showBubble('让我想想哦～🤔', false);
-          
+          const topicTimeout = setTimeout(() => {
+            showBubble('网络开小差了，再试一次吧～🌊', true);
+          }, 20000);
           topicGenerator.generateTopic().then(topic => {
+            clearTimeout(topicTimeout);
             if (topic) {
-              
-              //
               showBubble(topic, false);
             } else {
-              //
+              const currentBubble = document.getElementById('bubble-text');
+              if (currentBubble && currentBubble.textContent.includes('网络开小差')) {
+                return;  // 已经显示了，不重复
+              }
               showBubble('网络开小差了，再试一次吧～🌊', true);
             }
           });
