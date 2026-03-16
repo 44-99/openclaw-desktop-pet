@@ -77,9 +77,9 @@ function httpPost(url, data) {
       reject(error);
     });
 
-    req.setTimeout(10000, () => {
+    req.setTimeout(20000, () => {
       req.destroy();
-      reject(new Error('Request timeout'));
+      reject(new Error('Request timeout: AI 响应超时，请重试'));
     });
 
     req.write(jsonData);
@@ -402,6 +402,33 @@ app.on('before-quit', (event) => {
 ipcMain.handle('get-system-status', async () => {
   // 这个会通过 WebSocket 从 Python 获取
   return {};
+});
+
+// 获取 Gateway Token
+ipcMain.handle('get-gateway-token', async () => {
+  try {
+    const configPath = path.join(process.env.USERPROFILE, '.openclaw', 'openclaw.json');
+    
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      const token = config.gateway?.auth?.token;
+      console.log('🔑 Gateway Token:', token ? '***' + token.slice(-4) : 'NOT FOUND');
+      return token || null;
+    }
+  } catch (error) {
+    console.error('❌ 读取 Gateway Token 失败:', error);
+  }
+  return null;
+});
+
+// ⭐ 打印日志到 PowerShell 控制台（从渲染进程）
+ipcMain.on('log-to-console', (event, message, data) => {
+  const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  if (data !== undefined) {
+    console.log(`[${timestamp}] [Renderer] ${message}:`, data);
+  } else {
+    console.log(`[${timestamp}] [Renderer] ${message}`);
+  }
 });
 
 // 播放声音

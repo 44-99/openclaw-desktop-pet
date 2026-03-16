@@ -31,8 +31,64 @@ interface ExtensionConfig {
 let electronProcess: ChildProcess | null = null;
 let pythonProcess: ChildProcess | null = null;
 
+// ⭐ 文件系统锁：防止重复启动（记录 Electron PID，不是 Extension PID）
+const EXTENSION_ID = 'openclaw-desktop-pet';
+const LOCK_FILE = path.join(process.env.USERPROFILE || '', '.openclaw', 'extensions', EXTENSION_ID + '.lock');
+
+let electronPid: number | null = null;  // 记录实际启动的 Electron PID
+
+function isAlreadyRunning(): boolean {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      const lockContent = fs.readFileSync(LOCK_FILE, 'utf-8');
+      const pid = parseInt(lockContent.trim(), 10);
+      
+      // 检查进程是否还在运行
+      if (pid && !isNaN(pid)) {
+        try {
+          process.kill(pid, 0);  // 检查进程是否存在
+          console.log(`ℹ️ ${EXTENSION_ID} 已经在运行中（PID ${pid}），跳过重复初始化`);
+          return true;
+        } catch (e) {
+          // 进程不存在，删除旧的锁文件
+          console.log(`🗑️ 清理过期的锁文件（PID ${pid} 不存在）`);
+          fs.unlinkSync(LOCK_FILE);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ 检查锁文件失败:', error);
+  }
+  return false;
+}
+
+function createLockFile(pid: number) {
+  try {
+    const lockDir = path.dirname(LOCK_FILE);
+    if (!fs.existsSync(lockDir)) {
+      fs.mkdirSync(lockDir, { recursive: true });
+    }
+    fs.writeFileSync(LOCK_FILE, pid.toString(), 'utf-8');
+    console.log(`🔒 创建锁文件：${LOCK_FILE} (Electron PID ${pid})`);
+  } catch (error) {
+    console.error('❌ 创建锁文件失败:', error);
+  }
+}
+
+function removeLockFile() {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      fs.unlinkSync(LOCK_FILE);
+      console.log(`🗑️ 删除锁文件：${LOCK_FILE}`);
+    }
+  } catch (error) {
+    console.error('❌ 删除锁文件失败:', error);
+  }
+}
+
 function getExtensionRoot() {
-  return __dirname;
+  // 返回扩展的根目录（dist 的父目录）
+  return path.join(__dirname, '..');
 }
 
 function resolveElectronCommand() {
@@ -98,12 +154,12 @@ function resolvePythonCommand() {
  */
 function startElectron(config: ExtensionConfig) {
   try {
-    const extensionRoot = getExtensionRoot();
+    const extensionRoot = getExtensionRoot();  // 现在是扩展根目录（绝对路径）
     const electronCommand = resolveElectronCommand();
     const electronPath = path.join(extensionRoot, 'electron', 'main.cjs');
     
     electronProcess = spawn(electronCommand, [electronPath], {
-      cwd: extensionRoot,
+      cwd: extensionRoot,  // 工作目录为扩展根目录
       env: {
         ...process.env,
         PET_THEME: config.theme || 'default',
@@ -114,6 +170,13 @@ function startElectron(config: ExtensionConfig) {
         DEBUG: undefined,
       },
     });
+
+    // ⭐ 记录 Electron PID 到锁文件
+    if (electronProcess.pid) {
+      electronPid = electronProcess.pid;
+      createLockFile(electronPid);
+      console.log(`🔒 已记录 Electron PID: ${electronPid}`);
+    }
 
     electronProcess.stdout?.on('data', (data) => {
       console.log(`[Electron] ${data.toString().trim()}`);
@@ -126,16 +189,20 @@ function startElectron(config: ExtensionConfig) {
     electronProcess.on('error', (error) => {
       console.error('❌ Electron 进程启动失败:', error);
       electronProcess = null;
+      electronPid = null;
     });
 
     electronProcess.on('close', (code) => {
       console.log(`[Electron] 进程退出，代码：${code}`);
       electronProcess = null;
+      electronPid = null;
+      removeLockFile();  // Electron 退出时删除锁文件
     });
 
     console.log('✅ Electron 窗口已启动');
   } catch (error) {
     console.error('❌ 启动 Electron 失败:', error);
+    electronPid = null;
   }
 }
 
@@ -144,12 +211,12 @@ function startElectron(config: ExtensionConfig) {
  */
 function startPython() {
   try {
-    const extensionRoot = getExtensionRoot();
+    const extensionRoot = getExtensionRoot();  // 现在是扩展根目录（绝对路径）
     const pythonPath = path.join(extensionRoot, 'python', 'server.py');
     const pythonCommand = resolvePythonCommand();
     
     pythonProcess = spawn(pythonCommand, [pythonPath], {
-      cwd: path.join(extensionRoot, 'python'),
+      cwd: path.join(extensionRoot, 'python'),  // 工作目录为 python 目录
       env: process.env,
     });
 
@@ -212,18 +279,24 @@ function stopProcesses() {
  * @param api - OpenClaw Plugin API
  */
 export default function register(api: any) {
+  // ⭐ 检查是否已经在运行（使用文件系统锁）
+  if (isAlreadyRunning()) {
+    return { dispose: () => {} };
+  }
+  
   console.log('🦞 哈基虾 Extension 初始化...');
   
   const config: ExtensionConfig = api.config || {};
   
   if (config.enabled === false) {
     console.log('ℹ️ 哈基虾 Extension 已禁用，跳过初始化');
+    removeLockFile();
     return { dispose: () => {} };
   }
   
-  // 启动进程
+  // ⭐ 只启动 Electron，Python 由 Electron 负责启动
+  // 这样 Electron 的单实例锁会确保 Python 只启动一次
   startElectron(config);
-  startPython();
   
   // ⚠️ 注意：OpenClaw Gateway 目前不支持 tool.call/session.start/session.end 等事件钩子
   // 日志显示：unknown typed hook "tool.call" ignored
@@ -241,6 +314,7 @@ export default function register(api: any) {
     dispose: () => {
       console.log('🦞 哈基虾 Extension 清理中...');
       stopProcesses();
+      removeLockFile();  // ⭐ 删除锁文件
     }
   };
 }

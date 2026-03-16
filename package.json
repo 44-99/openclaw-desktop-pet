@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "electron .",
+    "start": "npm run build && electron .",
+    "start:dev": "npm run build && electron .",
     "build:win": "electron-builder --win",
     "build:portable": "electron-builder --win portable",
     "python": "cd python && python server.py"
@@ -24,9 +25,9 @@
   "license": "MIT",
   "openclaw": {
     "id": "openclaw-desktop-pet",
-    "extensions": ["./index.ts"]
+    "extensions": ["./dist/index.js"]
   },
-  "main": "./index.ts",
+  "main": "./dist/index.js",
   "devDependencies": {
     "electron": "^30.0.0",
     "electron-builder": "^24.0.0",

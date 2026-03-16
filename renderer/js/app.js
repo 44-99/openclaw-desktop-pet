@@ -10,6 +10,9 @@ import { ModelLoader } from './model-loader.js';
 import { AnimationController } from './animation-controller.js';
 // ==================== 导入增强粒子系统 ====================
 import { ParticleSystemManagerEnhanced, CodeRainParticle } from './particle-system-enhanced.js';
+// ==================== 导入 Gateway 连接器 ====================
+import { GatewayConnector } from './gateway-connector.js';
+import { getToolConfig, getToolColor } from './tool-mappings.js';
 // 全局变量
 let scene, camera, renderer, pet;
 let petParts = {};
@@ -20,7 +23,8 @@ let emotionSystem = null;
 let particleManager = null;
 let innerVoiceManager = null;
 let topicGenerator = null;
-let websocket = null;
+let websocket = null;  // Python WebSocket（系统监控）
+let gatewayConnector = null;  // ⭐ Gateway WebSocket（工具事件）
 let isRotating = false;
 let rotateStartX = 0, rotateStartY = 0;
 let isActionInProgress = false;
@@ -28,6 +32,10 @@ let cameraBaseZ = 5;
 let cameraFloatOffset = 0;
 let cameraFloatTime = 0;
 let petWrapper = null;
+// 工具调用状态
+let currentToolState = null;
+let toolActionInterval = null;
+let currentToolEffect = null;
 // ==================== 加载 GLB 模型（替换手搓龙虾） ====================
 async function loadGLBModel() {
   modelLoader = new ModelLoader();
@@ -607,11 +615,6 @@ function connectWebSocket() {
   
   tryConnect();
 }
-// ========== 工具事件处理 ==========
-let currentToolState = null;
-let toolActionInterval = null;
-let currentToolEffect = null;
-
 // ========== 系统状态监控模式 ==========
 let systemStatusMonitorEnabled = false;  // 是否开启实时监控模式
 
@@ -949,6 +952,226 @@ function showBubble(message, autoHide = true) {
     
   }
 }
+// ==================== Gateway 工具事件处理 ====================
+let toolEventTimer = null;  // 节流定时器
+
+/**
+ * 处理 Gateway 工具调用事件
+ * @param {object} toolData - 工具事件数据
+ */
+function handleGatewayToolCall(toolData) {
+  const { tool, phase, params, result, error } = toolData;
+  
+  // 打印到 PowerShell 控制台
+  window.electronAPI?.logToConsole?.('🔧 Gateway 工具事件', { tool, phase, params });
+  
+  // 节流处理（80ms，与 Control UI 一致）
+  if (toolEventTimer) {
+    clearTimeout(toolEventTimer);
+  }
+  
+  toolEventTimer = setTimeout(() => {
+    processToolEvent(toolData);
+  }, 80);
+}
+
+/**
+ * 实际处理工具事件的函数
+ * @param {object} toolData - 工具事件数据
+ */
+function processToolEvent(toolData) {
+  const { tool, phase, params, result, error } = toolData;
+  
+  window.electronAPI?.logToConsole?.('⚙️ 处理工具事件', { tool, phase });
+  
+  if (phase === 'start') {
+    // 工具开始执行
+    window.electronAPI?.logToConsole?.('▶️ 工具开始', tool);
+    const config = getToolConfig(tool);
+    
+    window.electronAPI?.logToConsole?.('📝 气泡文案:', config.summary);
+    window.electronAPI?.logToConsole?.('🎬 动画:', config.action);
+    window.electronAPI?.logToConsole?.('✨ 特效:', config.effect || '无');
+    window.electronAPI?.logToConsole?.('🎨 颜色:', config.color);
+    
+    // 1. 显示气泡
+    showBubble(config.summary, false);  // autoHide=false，手动隐藏
+    window.electronAPI?.logToConsole?.('✅ 气泡已显示');
+    
+    // 2. 播放动画
+    if (animController) {
+      // 停止之前的动画
+      if (toolActionInterval) {
+        clearInterval(toolActionInterval);
+        isActionInProgress = false;
+        window.electronAPI?.logToConsole?.('⏹️ 已停止旧动画');
+      }
+      
+      // 播放新动画
+      animController.play(config.action);
+      isActionInProgress = true;
+      window.electronAPI?.logToConsole?.('✅ 动画已播放:', config.action);
+      
+      // 如果是循环动画，设置间隔触发
+      if (['wiggle', 'bounce', 'shake'].includes(config.action)) {
+        toolActionInterval = setInterval(() => {
+          if (animController && isActionInProgress) {
+            animController.play(config.action);
+          }
+        }, 800);
+        window.electronAPI?.logToConsole?.('🔄 已设置循环动画');
+      }
+    } else {
+      window.electronAPI?.logToConsole?.('❌ animController 不存在');
+    }
+    
+    // 3. 触发特效
+    if (config.effect && particleManager) {
+      if (currentToolEffect) {
+        currentToolEffect.dispose();
+        window.electronAPI?.logToConsole?.('🗑️ 已清除旧特效');
+      }
+      
+      if (config.effect === 'code-rain') {
+        currentToolEffect = new CodeRainParticle(scene);
+        window.electronAPI?.logToConsole?.('✅ 代码雨特效已触发');
+      } else if (config.effect === 'spark') {
+        particleManager.triggerEffect('spark', petWrapper.position);
+        window.electronAPI?.logToConsole?.('✅ 闪烁特效已触发');
+      }
+    } else {
+      if (!config.effect) {
+        window.electronAPI?.logToConsole?.('ℹ️ 该工具无特效');
+      }
+      if (!particleManager) {
+        window.electronAPI?.logToConsole?.('❌ particleManager 不存在');
+      }
+    }
+    
+    // 4. 更新颜色
+    if (colorRenderer) {
+      colorRenderer.updateColor(config.color);
+      window.electronAPI?.logToConsole?.('✅ 颜色已更新:', config.color);
+    } else {
+      window.electronAPI?.logToConsole?.('❌ colorRenderer 不存在');
+    }
+    
+    // 5. 保存当前状态
+    currentToolState = { tool, config };
+    window.electronAPI?.logToConsole?.('💾 状态已保存');
+    
+  } else if (phase === 'result') {
+    // 工具执行完成
+    window.electronAPI?.logToConsole?.('⏹️ 工具完成', tool);
+    hideBubble();
+    window.electronAPI?.logToConsole?.('✅ 气泡已隐藏');
+    
+    // 停止动画
+    if (toolActionInterval) {
+      clearInterval(toolActionInterval);
+      toolActionInterval = null;
+      isActionInProgress = false;
+      window.electronAPI?.logToConsole?.('⏹️ 动画已停止');
+    }
+    
+    // 恢复 idle 动画
+    if (animController) {
+      const animations = animController.getAvailableAnimations();
+      if (animations.length > 0) {
+        animController.play('idle');
+        window.electronAPI?.logToConsole?.('✅ 已恢复 idle 动画');
+      }
+    }
+    
+    // 清除特效
+    if (currentToolEffect) {
+      if (currentToolEffect.dispose) {
+        currentToolEffect.dispose();
+      }
+      currentToolEffect = null;
+      window.electronAPI?.logToConsole?.('🗑️ 特效已清除');
+    }
+    
+    // 恢复空闲颜色（浅蓝色）
+    if (colorRenderer) {
+      colorRenderer.updateColor('#B0C4DE');
+      window.electronAPI?.logToConsole?.('✅ 颜色已恢复空闲状态');
+    }
+    
+    // 清除状态
+    currentToolState = null;
+    window.electronAPI?.logToConsole?.('🗑️ 状态已清除');
+    
+  } else if (phase === 'error') {
+    // 工具执行错误
+    window.electronAPI?.logToConsole?.('❌ 工具执行错误', { tool, error });
+    
+    // 显示错误气泡
+    showBubble(`❌ ${tool} 执行失败`, true);
+    window.electronAPI?.logToConsole?.('✅ 错误气泡已显示');
+    
+    // 恢复空闲状态
+    if (colorRenderer) {
+      colorRenderer.updateColor('#B0C4DE');
+      window.electronAPI?.logToConsole?.('✅ 颜色已恢复空闲状态');
+    }
+  } else {
+    window.electronAPI?.logToConsole?.('⚠️ 未知 phase:', phase);
+  }
+}
+
+/**
+ * 初始化 Gateway WebSocket 连接 - 简化版测试
+ * 
+ * 测试方案：只发送 Token 看能否连接成功
+ * 如果成功，就不需要完整的 GatewayBrowserClient 实现
+ */
+async function initGatewayConnection() {
+  try {
+    // 从 Electron 获取 Gateway Token
+    let gatewayToken = null;
+    if (window.electronAPI?.getGatewayToken) {
+      gatewayToken = await window.electronAPI.getGatewayToken();
+    }
+    
+    window.electronAPI?.logToConsole?.('🧪 开始测试简化版 Gateway 连接...');
+    window.electronAPI?.logToConsole?.('🔑 Gateway Token:', gatewayToken ? '***' + gatewayToken.slice(-4) : '无');
+    
+    // 动态导入简化版连接器
+    const { SimpleGatewayClient } = await import('./gateway-simple.js');
+    
+    // 创建客户端
+    gatewayConnector = new SimpleGatewayClient({
+      url: 'ws://127.0.0.1:18789',
+      token: gatewayToken,
+      onHello: (hello) => {
+        window.electronAPI?.logToConsole?.('✅ 连接成功！', hello);
+        window.electronAPI?.logToConsole?.('🎉 简化版测试通过！无需完整实现 GatewayBrowserClient');
+      },
+      onEvent: (evt) => {
+        window.electronAPI?.logToConsole?.('📨 收到事件', evt);
+        if (evt.event === 'tool.call') {
+          handleGatewayToolCall(evt.payload);
+        }
+      },
+      onClose: (info) => {
+        window.electronAPI?.logToConsole?.('⚠️ 连接关闭', info);
+        if (info.code === 1008 || info.reason?.includes('invalid')) {
+          window.electronAPI?.logToConsole?.('❌ 简化版测试失败：握手协议不匹配');
+          window.electronAPI?.logToConsole?.('ℹ️ 需要实施完整方案（方案 C）');
+        }
+      }
+    });
+    
+    // 启动连接
+    gatewayConnector.start();
+    window.electronAPI?.logToConsole?.('⏳ 等待 Gateway 响应...');
+    
+  } catch (error) {
+    window.electronAPI?.logToConsole?.('❌ Gateway 测试失败', error);
+  }
+}
+
 // ==================== 初始化 ====================
 async function init() {
   
@@ -980,6 +1203,7 @@ async function init() {
   await initModules();
   setupMouseControls();
   connectWebSocket();
+  initGatewayConnection();  // ⭐ 新增：Gateway 连接（不阻塞初始化）
   
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;

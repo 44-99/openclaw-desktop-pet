@@ -77,10 +77,11 @@ class WebSocketServer:
         """强制杀死占用端口的进程，并验证端口是否释放"""
         system = platform.system()
         killed_pids = []
+        max_wait_seconds = 15  # 增加等待时间到 15 秒
 
         try:
             if system == "Windows":
-                # Step 1: 查找占用端口的进程
+                # Step 1: 查找占用端口的进程（包括所有状态）
                 result = subprocess.run(
                     f'netstat -ano | findstr :{port}',
                     shell=True,
@@ -93,11 +94,12 @@ class WebSocketServer:
                 if result.stdout:
                     logger.info(f"[Port {port}] Found processes:")
                     for line in result.stdout.strip().split('\n'):
-                        if line and 'LISTENING' in line:
+                        if line and (':'+str(port)) in line:
                             parts = line.split()
+                            # 查找 PID（最后一列）
                             if len(parts) >= 5:
                                 pid = parts[-1]
-                                if pid.isdigit() and pid not in killed_pids:
+                                if pid.isdigit() and pid not in killed_pids and pid != '0':
                                     # Step 2: 强制杀死进程
                                     logger.info(f"[Port {port}] Killing PID {pid}...")
                                     kill_result = subprocess.run(
@@ -113,16 +115,20 @@ class WebSocketServer:
                                     else:
                                         logger.warning(f"[Port {port}] ❌ Failed to kill PID {pid}: {kill_result.stderr}")
 
-                # Step 3: 等待端口释放
+                # Step 3: 等待端口释放（增加等待时间和验证次数）
                 if killed_pids:
-                    logger.info(f"[Port {port}] Waiting for port to release...")
-                    for _ in range(10):  # 最多等 5 秒
-                        time.sleep(0.5)
+                    logger.info(f"[Port {port}] Waiting for port to release ({max_wait_seconds}s max)...")
+                    wait_count = 0
+                    while wait_count < max_wait_seconds:
+                        time.sleep(1.0)
+                        wait_count += 1
                         if not self.is_port_in_use(port):
-                            logger.info(f"[Port {port}] ✅ Port released!")
+                            logger.info(f"[Port {port}] ✅ Port released after {wait_count}s!")
                             return True
+                        if wait_count % 3 == 0:  # 每 3 秒报告一次进度
+                            logger.info(f"[Port {port}] ⏳ Still waiting... ({wait_count}/{max_wait_seconds}s)")
 
-                    logger.warning(f"[Port {port}] ⚠️ Port still in use after killing processes")
+                    logger.warning(f"[Port {port}] ⚠️ Port still in use after {max_wait_seconds}s")
                     return False
 
         except Exception as e:
@@ -208,6 +214,12 @@ class WebSocketServer:
     async def start(self):
         logger.info("[Hajixia] Starting...")
 
+        # Step 0: 启动前先清理端口（防止旧实例残留）
+        if self.is_port_in_use(self.port):
+            logger.warning(f"[Pre-Cleanup] Port {self.port} in use, cleaning up...")
+            self.kill_process_on_port(self.port)
+            await asyncio.sleep(2)  # 等待 2 秒确保端口释放
+
         # Step 1: Try to kill existing process on default port (max 3 attempts)
         max_attempts = 3
         for attempt in range(max_attempts):
@@ -244,7 +256,7 @@ class WebSocketServer:
 
         logger.info(f"[WS] Listening: ws://{self.host}:{self.port}")
 
-        # 配置 websockets 服务器，禁用严格的 HTTP 检查以减少握手错误
+        # 配置 websockets 服务器
         async with websockets.serve(
             self.handler, 
             self.host, 
