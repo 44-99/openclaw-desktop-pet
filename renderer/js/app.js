@@ -3,11 +3,9 @@ import * as THREE from 'three';
 // ==================== 导入现有模块 ====================
 import { TopicGenerator } from './topic-generator.js';
 import { ColorRenderer } from './color-renderer.js';
-import { EmotionState, EmotionTrigger, EXPRESSION_CONFIG } from './emotion-system.js';
 import { InnerVoiceManager } from './inner-voice.js';
 // ==================== 导入 GLB 模型加载 ====================
 import { ModelLoader } from './model-loader.js';
-import { AnimationController } from './animation-controller.js';
 // ==================== 导入增强粒子系统 ====================
 import { ParticleSystemManagerEnhanced, CodeRainParticle } from './particle-system-enhanced.js';
 // ==================== 导入 Gateway 连接器 ====================
@@ -16,10 +14,8 @@ import { getToolConfig, getToolColor } from './tool-mappings.js';
 // 全局变量
 let scene, camera, renderer, pet;
 let petParts = {};
-let animController = null;
 let modelLoader = null;
 let colorRenderer = null;
-let emotionSystem = null;
 let particleManager = null;
 let innerVoiceManager = null;
 let topicGenerator = null;
@@ -55,18 +51,7 @@ async function loadGLBModel() {
     petWrapper.add(pet);
     scene.add(petWrapper);
     
-    animController = new AnimationController(gltf, pet);
-    
-    // 播放 idle 动画
-    const animations = animController.getAvailableAnimations();
-    if (animations.length > 0) {
-      if (animations.includes('idle')) {
-        animController.play('idle');
-      } else {
-        animController.play(animations[0]);
-      }
-    }
-    
+    // GLB 动画控制器已删除，使用粒子特效代替
     if (particleManager) {
       particleManager.triggerEffect('idle', petWrapper.position);
     }
@@ -301,11 +286,7 @@ async function initModules() {
   // 1. 颜色渲染器
   colorRenderer = new ColorRenderer(pet);
   
-  // 2. 情绪系统
-  emotionSystem = new EmotionState();
-  new EmotionTrigger(emotionSystem, petParts);
-  
-  // 3. 粒子系统
+  // 2. 粒子系统
   particleManager = new ParticleSystemManagerEnhanced(scene);
   
   // 4. 内心戏管理器
@@ -999,31 +980,11 @@ function processToolEvent(toolData) {
     showBubble(config.summary, false);  // autoHide=false，手动隐藏
     window.electronAPI?.logToConsole?.('✅ 气泡已显示');
     
-    // 2. 播放动画
-    if (animController) {
-      // 停止之前的动画
-      if (toolActionInterval) {
-        clearInterval(toolActionInterval);
-        isActionInProgress = false;
-        window.electronAPI?.logToConsole?.('⏹️ 已停止旧动画');
-      }
-      
-      // 播放新动画
-      animController.play(config.action);
+    // 2. 播放动画（使用 executeSpecificAction）
+    if (!isActionInProgress) {
+      executeSpecificAction(config.action);
       isActionInProgress = true;
       window.electronAPI?.logToConsole?.('✅ 动画已播放:', config.action);
-      
-      // 如果是循环动画，设置间隔触发
-      if (['wiggle', 'bounce', 'shake'].includes(config.action)) {
-        toolActionInterval = setInterval(() => {
-          if (animController && isActionInProgress) {
-            animController.play(config.action);
-          }
-        }, 800);
-        window.electronAPI?.logToConsole?.('🔄 已设置循环动画');
-      }
-    } else {
-      window.electronAPI?.logToConsole?.('❌ animController 不存在');
     }
     
     // 3. 触发特效
@@ -1073,15 +1034,6 @@ function processToolEvent(toolData) {
       toolActionInterval = null;
       isActionInProgress = false;
       window.electronAPI?.logToConsole?.('⏹️ 动画已停止');
-    }
-    
-    // 恢复 idle 动画
-    if (animController) {
-      const animations = animController.getAvailableAnimations();
-      if (animations.length > 0) {
-        animController.play('idle');
-        window.electronAPI?.logToConsole?.('✅ 已恢复 idle 动画');
-      }
     }
     
     // 清除特效
@@ -1272,12 +1224,8 @@ function animate() {
   const now = Date.now();
   
   if (pet) {
-    if (animController && !isActionInProgress) {
-      animController.update(delta);
-    }
-    
     // Fallback：手搓龙虾的漂浮动画
-    if (!animController && !isActionInProgress) {
+    if (!isActionInProgress) {
       const floatSpeed = colorRenderer?.currentLevel === '夯爆了' ? 2.5 : 1;
       const floatAmp = colorRenderer?.currentLevel === '夯爆了' ? 0.12 : 0.06;
       pet.position.y = Math.sin(time * floatSpeed) * floatAmp;
