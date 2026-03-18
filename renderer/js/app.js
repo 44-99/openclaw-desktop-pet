@@ -9,7 +9,7 @@ import { ModelLoader } from './model-loader.js';
 // ==================== 导入增强粒子系统 ====================
 import { ParticleSystemManagerEnhanced, CodeRainParticle } from './particle-system-enhanced.js';
 // ==================== 导入 Gateway 连接器 ====================
-import { GatewayConnector } from './gateway-connector.js';
+import { MinimalGatewayClient } from './gateway/minimal-gateway-client.js';
 import { getToolConfig, getToolColor } from './tool-mappings.js';
 // 全局变量
 let scene, camera, renderer, pet;
@@ -20,7 +20,7 @@ let particleManager = null;
 let innerVoiceManager = null;
 let topicGenerator = null;
 let websocket = null;  // Python WebSocket（系统监控）
-let gatewayConnector = null;  // ⭐ Gateway WebSocket（工具事件）
+let gatewayClient = null;  // ⭐ Gateway WebSocket（工具事件）
 let isRotating = false;
 let rotateStartX = 0, rotateStartY = 0;
 let isActionInProgress = false;
@@ -567,7 +567,7 @@ function connectWebSocket() {
       websocket = new WebSocket(`ws://localhost:${port}`);
       
       websocket.onopen = () => {
-        hideLoading();
+        // hideLoading() 已在 init() 中调用，此处移除
       };
       
       websocket.onmessage = (event) => {
@@ -1073,57 +1073,8 @@ function processToolEvent(toolData) {
   }
 }
 
-/**
- * 初始化 Gateway WebSocket 连接 - 简化版测试
- * 
- * 测试方案：只发送 Token 看能否连接成功
- * 如果成功，就不需要完整的 GatewayBrowserClient 实现
- */
-async function initGatewayConnection() {
-  try {
-    // 从 Electron 获取 Gateway Token
-    let gatewayToken = null;
-    if (window.electronAPI?.getGatewayToken) {
-      gatewayToken = await window.electronAPI.getGatewayToken();
-    }
-    
-    window.electronAPI?.logToConsole?.('🧪 开始测试简化版 Gateway 连接...');
-    window.electronAPI?.logToConsole?.('🔑 Gateway Token:', gatewayToken ? '***' + gatewayToken.slice(-4) : '无');
-    
-    // 动态导入简化版连接器
-    const { SimpleGatewayClient } = await import('./gateway-simple.js');
-    
-    // 创建客户端
-    gatewayConnector = new SimpleGatewayClient({
-      url: 'ws://127.0.0.1:18789',
-      token: gatewayToken,
-      onHello: (hello) => {
-        window.electronAPI?.logToConsole?.('✅ 连接成功！', hello);
-        window.electronAPI?.logToConsole?.('🎉 简化版测试通过！无需完整实现 GatewayBrowserClient');
-      },
-      onEvent: (evt) => {
-        window.electronAPI?.logToConsole?.('📨 收到事件', evt);
-        if (evt.event === 'tool.call') {
-          handleGatewayToolCall(evt.payload);
-        }
-      },
-      onClose: (info) => {
-        window.electronAPI?.logToConsole?.('⚠️ 连接关闭', info);
-        if (info.code === 1008 || info.reason?.includes('invalid')) {
-          window.electronAPI?.logToConsole?.('❌ 简化版测试失败：握手协议不匹配');
-          window.electronAPI?.logToConsole?.('ℹ️ 需要实施完整方案（方案 C）');
-        }
-      }
-    });
-    
-    // 启动连接
-    gatewayConnector.start();
-    window.electronAPI?.logToConsole?.('⏳ 等待 Gateway 响应...');
-    
-  } catch (error) {
-    window.electronAPI?.logToConsole?.('❌ Gateway 测试失败', error);
-  }
-}
+// ==================== Gateway 连接（使用精简版客户端）====================
+import { initGatewayConnection } from './app-gateway-init.js';
 
 // ==================== 初始化 ====================
 async function init() {
@@ -1166,6 +1117,8 @@ async function init() {
   
   animate();
   
+  // ⭐ 修复：初始化完成后立即隐藏 loading，不等 WebSocket 连接
+  hideLoading();
   
 }
 //
