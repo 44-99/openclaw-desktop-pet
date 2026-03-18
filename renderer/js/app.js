@@ -1,39 +1,27 @@
-// ==================== 全局错误捕获 ====================
+// 全局错误捕获
 window.addEventListener('error', (event) => {
-  console.error('❌ [GLOBAL ERROR]', event.message);
-  console.error('📍 Location:', event.filename, event.lineno, event.colno);
-  console.error('📚 Stack:', event.error?.stack);
+  console.error('❌ Global Error:', event.message);
+  console.error('Stack:', event.error?.stack);
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('❌ [UNHANDLED REJECTION]', event.reason);
+  console.error('❌ Unhandled Rejection:', event.reason);
 });
 
-console.log('🦞 [app.js] 模块开始加载...');
+console.log('🦞 [app.js] Module loading...');
 
-// ==================== 导入 Three.js ====================
 import * as THREE from 'three';
-console.log('✅ [app.js] Three.js 导入成功');
-
-// ==================== 导入现有模块 ====================
 import { TopicGenerator } from './topic-generator.js';
 import { ColorRenderer } from './color-renderer.js';
 import { InnerVoiceManager } from './inner-voice.js';
-console.log('✅ [app.js] 基础模块导入成功');
-
-// ==================== 导入 GLB 模型加载 ====================
 import { ModelLoader } from './model-loader.js';
-console.log('✅ [app.js] ModelLoader 导入成功');
-
-// ==================== 导入增强粒子系统 ====================
 import { ParticleSystemManagerEnhanced, CodeRainParticle } from './particle-system-enhanced.js';
-console.log('✅ [app.js] ParticleSystemManagerEnhanced 导入成功');
-
-// ==================== 导入 Gateway 连接器 ====================
 import { MinimalGatewayClient } from './gateway/minimal-gateway-client.js';
 import { getToolConfig, getToolColor } from './tool-mappings.js';
 import { initGatewayConnection } from './app-gateway-init.js';
-console.log('✅ [app.js] Gateway 模块导入成功');
+
+console.log('✅ [app.js] Modules loaded');
+
 // 全局变量
 let scene, camera, renderer, pet;
 let petParts = {};
@@ -42,8 +30,8 @@ let colorRenderer = null;
 let particleManager = null;
 let innerVoiceManager = null;
 let topicGenerator = null;
-let websocket = null;  // Python WebSocket（系统监控）
-let gatewayClient = null;  // ⭐ Gateway WebSocket（工具事件）
+let websocket = null;
+let gatewayClient = null;
 let isRotating = false;
 let rotateStartX = 0, rotateStartY = 0;
 let isActionInProgress = false;
@@ -296,9 +284,7 @@ function createPetFallback() {
   petWrapper = new THREE.Group();
   petWrapper.add(pet);
   scene.add(petWrapper);
-  
-  
-  
+
   //
   if (particleManager) {
     particleManager.triggerEffect('idle', petWrapper.position);
@@ -335,19 +321,18 @@ async function initModules() {
         }
         return { success: false, error: 'IPC not available' };
       },
-      showBubble: (message) => {
-        showBubble(message, true);
+      showBubble: (message, autoHide = true) => {
+        // ⭐ 来者居上：话题气泡
+        showBubble(message, autoHide, 'topic');
       },
       hasTavilyAPI: hasTavilyAPI,
       memoryPath: ''
     });
-    
-    
+
   };
   
   await initTopicGenerator();
-  
-  
+
 }
 // ==================== 鼠标控制 ====================
 let isLeftButtonDown = false;
@@ -370,8 +355,7 @@ function setupMouseControls() {
       
       windowStartX = window.screenX || 0;
       windowStartY = window.screenY || 0;
-      
-      
+
     } else if (e.button === 2) {
       rotateStartX = e.clientX;
       rotateStartY = e.clientY;
@@ -392,9 +376,7 @@ function setupMouseControls() {
         
         const targetX = windowStartX + offsetX;
         const targetY = windowStartY + offsetY;
-        
-        
-        
+
         if (window.electronAPI && window.electronAPI.setWindowPosition) {
           window.electronAPI.setWindowPosition(targetX, targetY);
         }
@@ -416,28 +398,26 @@ function setupMouseControls() {
       const clickDuration = Date.now() - clickStartTime;
       
       if (!isLeftDragging && clickDuration < LONG_CLICK_THRESHOLD) {
-        
-        
+
         if (topicGenerator) {
-          //
           if (topicGenerator.isBusy()) {
-            showBubble('别急嘛，正在努力思考中～🤔', false);
+            showBubble('别急嘛，正在努力思考中～🤔', false, 'topic');
             return;
           }
-          showBubble('让我想想哦～🤔', false);
+          showBubble('让我想想哦～🤔', false, 'topic');
           const topicTimeout = setTimeout(() => {
-            showBubble('网络开小差了，再试一次吧～🌊', true);
+            showBubble('网络开小差了，再试一次吧～🌊', true, 'topic');
           }, 20000);
           topicGenerator.generateTopic().then(topic => {
             clearTimeout(topicTimeout);
             if (topic) {
-              showBubble(topic, false);
+              showBubble(topic, false, 'topic');
             } else {
               const currentBubble = document.getElementById('bubble-text');
               if (currentBubble && currentBubble.textContent.includes('网络开小差')) {
-                return;  // 已经显示了，不重复
+                return;
               }
-              showBubble('网络开小差了，再试一次吧～🌊', true);
+              showBubble('网络开小差了，再试一次吧～🌊', true, 'topic');
             }
           });
         }
@@ -477,7 +457,6 @@ let menuAutoHideTimer = null;  //
 function showContextMenu(x, y) {
   const menu = document.getElementById('context-menu');
   if (menu) {
-    //
     if (menuAutoHideTimer) {
       clearTimeout(menuAutoHideTimer);
     }
@@ -486,10 +465,8 @@ function showContextMenu(x, y) {
     menu.style.top = y + 'px';
     menu.classList.remove('hidden');
     
-    //
     menuAutoHideTimer = setTimeout(() => {
       menu.classList.add('hidden');
-      
     }, 3000);
     
     menu.querySelectorAll('.menu-item').forEach(item => {
@@ -499,7 +476,6 @@ function showContextMenu(x, y) {
         if (action) handleMenuAction(action);
         menu.classList.add('hidden');
         
-        //
         if (menuAutoHideTimer) {
           clearTimeout(menuAutoHideTimer);
           menuAutoHideTimer = null;
@@ -508,8 +484,8 @@ function showContextMenu(x, y) {
     });
   }
 }
+
 function handleMenuAction(action) {
-  // 📊 如果开启了系统状态监控，用户进行其他操作时关闭它
   if (systemStatusMonitorEnabled && action !== 'status') {
     systemStatusMonitorEnabled = false;
   }
@@ -520,20 +496,14 @@ function handleMenuAction(action) {
         websocket.send(JSON.stringify({ type: 'chat', message: '你好！' }));
       }
       break;
-    // 'rotate' 已删除，替换为新特效
     case 'status':
-      // 📊 进入系统状态实时监控模式
       systemStatusMonitorEnabled = true;
-      
-      // 立即显示当前状态
-      showBubble(`💻 系统监控中... ${colorRenderer.currentLevel}`, false);
-      
+      showBubble(`💻 系统监控中... ${colorRenderer.currentLevel}`, false, 'status');
       break;
     case 'openclaw':
       if (topicGenerator) {
         const sessionKey = topicGenerator.getFullSessionKey();
-        
-        
+
         if (window.electronAPI && window.electronAPI.openDesktopPetSession) {
           window.electronAPI.openDesktopPetSession(sessionKey)
             .then(result => {
@@ -638,8 +608,7 @@ let systemStatusMonitorEnabled = false;  // 是否开启实时监控模式
 // 处理工具调用事件（不改变颜色！）
 function handleToolCall(event) {
   const { tool, summary, action } = event;
-  
-  
+
   // 1. 更新气泡（不消失，直到新工具到来）
   showBubble(summary, false);  // autoHide=false，气泡不自动消失
   
@@ -688,19 +657,16 @@ function handleToolCall(event) {
 function handleSystemStatus(data) {
   const { cpu, memory, gpu, performance_score, performance_level } = data;
   
-  // ✅ 颜色只由系统负载决定（不可覆盖）
   if (colorRenderer && performance_level) {
     colorRenderer.updateColor(performance_level);
   }
   
   updateStatusIndicator(cpu, memory);
   
-  // 📊 如果开启了系统状态监控模式，实时更新气泡
-  if (systemStatusMonitorEnabled) {
+  if (systemStatusMonitorEnabled && currentBubbleSource === 'status') {
     const bubble = document.getElementById('speech-bubble');
     const text = document.getElementById('bubble-text');
     if (bubble && text && !bubble.classList.contains('hidden')) {
-      // 格式化状态信息
       const statusText = `💻 CPU: ${cpu.toFixed(0)}% | 内存：${memory.toFixed(0)}% | ${performance_level}`;
       text.textContent = statusText;
     }
@@ -942,11 +908,16 @@ function hideLoading() {
   if (loading) loading.style.display = 'none';
 }
 let bubbleHideTimer = null;
-function showBubble(message, autoHide = true) {
+// 气泡来源追踪
+let currentBubbleSource = null;
+
+function showBubble(message, autoHide = true, source = 'default') {
   const bubble = document.getElementById('speech-bubble');
   const text = document.getElementById('bubble-text');
   
   if (bubble && text) {
+    currentBubbleSource = source;
+    
     if (bubbleHideTimer) {
       clearTimeout(bubbleHideTimer);
       bubbleHideTimer = null;
@@ -956,17 +927,14 @@ function showBubble(message, autoHide = true) {
     bubble.classList.remove('hidden');
     bubble.classList.add('visible');
     
-    
-    
     if (autoHide) {
       bubbleHideTimer = setTimeout(() => {
         bubble.classList.remove('visible');
         bubble.classList.add('hidden');
-        
+        currentBubbleSource = null;
+        bubbleHideTimer = null;
       }, 8000);
     }
-  } else {
-    
   }
 }
 // ==================== Gateway 工具事件处理 ====================
@@ -999,103 +967,58 @@ function handleGatewayToolCall(toolData) {
 function processToolEvent(toolData) {
   const { tool, phase, params, result, error } = toolData;
   
-  window.electronAPI?.logToConsole?.('⚙️ 处理工具事件', { tool, phase });
-  
   if (phase === 'start') {
-    // 工具开始执行
-    window.electronAPI?.logToConsole?.('▶️ 工具开始', tool);
     const config = getToolConfig(tool);
     
-    window.electronAPI?.logToConsole?.('📝 气泡文案:', config.summary);
-    window.electronAPI?.logToConsole?.('🎬 动画:', config.action);
-    window.electronAPI?.logToConsole?.('✨ 特效:', config.effect || '无');
-    window.electronAPI?.logToConsole?.('🎨 颜色:', config.color);
+    showBubble(config.summary, false, 'tool');
     
-    // 1. 显示气泡
-    showBubble(config.summary, false);  // autoHide=false，手动隐藏
-    window.electronAPI?.logToConsole?.('✅ 气泡已显示');
-    
-    // 2. 播放动画（使用 executeSpecificAction）
     if (!isActionInProgress) {
       executeSpecificAction(config.action);
       isActionInProgress = true;
-      window.electronAPI?.logToConsole?.('✅ 动画已播放:', config.action);
     }
     
-    // 3. 触发特效
     if (config.effect && particleManager) {
       if (currentToolEffect) {
         currentToolEffect.dispose();
-        window.electronAPI?.logToConsole?.('🗑️ 已清除旧特效');
       }
       
       if (config.effect === 'code-rain') {
         currentToolEffect = new CodeRainParticle(scene);
-        window.electronAPI?.logToConsole?.('✅ 代码雨特效已触发');
       } else if (config.effect === 'spark') {
         particleManager.triggerEffect('spark', petWrapper.position);
-        window.electronAPI?.logToConsole?.('✅ 闪烁特效已触发');
-      }
-    } else {
-      if (!config.effect) {
-        window.electronAPI?.logToConsole?.('ℹ️ 该工具无特效');
-      }
-      if (!particleManager) {
-        window.electronAPI?.logToConsole?.('❌ particleManager 不存在');
       }
     }
     
-    // 4. 更新颜色
     if (colorRenderer) {
       colorRenderer.updateColor(config.color);
-      window.electronAPI?.logToConsole?.('✅ 颜色已更新:', config.color);
-    } else {
-      window.electronAPI?.logToConsole?.('❌ colorRenderer 不存在');
     }
     
-    // 5. 保存当前状态
     currentToolState = { tool, config };
-    window.electronAPI?.logToConsole?.('💾 状态已保存');
     
   } else if (phase === 'result') {
-    // 工具执行完成
-    window.electronAPI?.logToConsole?.('⏹️ 工具完成', tool);
     hideBubble();
-    window.electronAPI?.logToConsole?.('✅ 气泡已隐藏');
     
-    // 停止动画
     if (toolActionInterval) {
       clearInterval(toolActionInterval);
       toolActionInterval = null;
       isActionInProgress = false;
-      window.electronAPI?.logToConsole?.('⏹️ 动画已停止');
     }
     
-    // 清除特效
     if (currentToolEffect) {
       if (currentToolEffect.dispose) {
         currentToolEffect.dispose();
       }
       currentToolEffect = null;
-      window.electronAPI?.logToConsole?.('🗑️ 特效已清除');
     }
     
-    // 恢复空闲颜色（浅蓝色）
     if (colorRenderer) {
       colorRenderer.updateColor('#B0C4DE');
-      window.electronAPI?.logToConsole?.('✅ 颜色已恢复空闲状态');
     }
     
-    // 清除状态
     currentToolState = null;
-    window.electronAPI?.logToConsole?.('🗑️ 状态已清除');
     
   } else if (phase === 'error') {
-    // 工具执行错误
-    window.electronAPI?.logToConsole?.('❌ 工具执行错误', { tool, error });
-    
-    // 显示错误气泡
-    showBubble(`❌ ${tool} 执行失败`, true);
+    showBubble(`❌ ${tool} 执行失败`, true, 'tool');
     window.electronAPI?.logToConsole?.('✅ 错误气泡已显示');
     
     // 恢复空闲状态
@@ -1110,18 +1033,13 @@ function processToolEvent(toolData) {
 
 // ==================== 初始化 ====================
 async function init() {
-  console.log('🚀 [init] 开始初始化...');
+  console.log('🚀 [init] Initializing...');
   
   try {
-    // 1. 创建场景
-    console.log('📦 [init] 创建 Three.js 场景...');
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 0.6, 5);
-    console.log('✅ [init] 场景和相机创建成功');
     
-    // 2. 创建渲染器
-    console.log('🎨 [init] 创建 WebGL 渲染器...');
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
@@ -1129,13 +1047,10 @@ async function init() {
     
     const canvasContainer = document.getElementById('canvas-container');
     if (!canvasContainer) {
-      throw new Error('❌ canvas-container 元素不存在！');
+      throw new Error('canvas-container not found');
     }
     canvasContainer.appendChild(renderer.domElement);
-    console.log('✅ [init] 渲染器创建并添加到 DOM');
     
-    // 3. 添加灯光
-    console.log('💡 [init] 添加灯光...');
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
     scene.add(ambientLight);
     
@@ -1146,40 +1061,26 @@ async function init() {
     const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
     backLight.position.set(-3, 2, -3);
     scene.add(backLight);
-    console.log('✅ [init] 灯光添加完成');
     
-    // 4. 加载模型
-    console.log('🦞 [init] 加载 3D 模型...');
     await loadGLBModel();
-    console.log('✅ [init] 模型加载完成');
-    
-    // 5. 初始化模块
-    console.log('🔧 [init] 初始化模块...');
     await initModules();
     setupMouseControls();
     connectWebSocket();
     initGatewayConnection();
-    console.log('✅ [init] 模块初始化完成');
     
-    // 6. 窗口大小监听
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
     
-    // 7. 开始渲染循环
-    console.log('🎬 [init] 开始渲染循环...');
     animate();
-    
-    // 8. 隐藏 loading
-    console.log('👋 [init] 隐藏 loading...');
     hideLoading();
-    console.log('✅ [init] 初始化完成！');
+    
+    console.log('✅ [init] Complete');
     
   } catch (error) {
-    console.error('❌ [init] 初始化失败:', error);
-    console.error('📚 Stack:', error.stack);
+    console.error('❌ [init] Failed:', error);
   }
 }
 //
@@ -1214,8 +1115,7 @@ function triggerActionEffects(actionType, petPosition) {
   //
   const effectIndex = Math.floor(Math.random() * availableEffects.length);
   const selectedEffect = availableEffects[effectIndex];
-  
-  
+
   //
   const effectMapping = {
     'star_trail': 'rotateCW',      // 复用星光轨迹 + 旋转光环
@@ -1307,6 +1207,5 @@ window.getPetColor = function() {
   }
   return null;
 };
-
 
 init();
