@@ -2,7 +2,7 @@
 
 > 🦞 3D 桌面宠物，深度集成 OpenClaw，实时显示 AI 状态
 
-**最新版本**: v3.2.2 (2026-03-15)
+**最新版本**: v3.2.8 (2026-03-19)
 
 ---
 
@@ -13,24 +13,32 @@ openclaw-desktop-pet/
 ├── openclaw.plugin.json    # OpenClaw 插件配置
 ├── package.json            # NPM 配置
 ├── tsconfig.json           # TypeScript 配置
-├── index.ts                # Extension 入口（编译后）
-├── src/
-│   └── index.ts            # TypeScript 源码
+├── index.ts                # Extension 入口（TypeScript）
 ├── electron/
-│   ├── main.js             # Electron 主进程
-│   └── preload.js          # 预加载脚本
+│   ├── main.cjs            # Electron 主进程（CommonJS）
+│   └── preload.cjs         # 预加载脚本（IPC 桥接）
 ├── renderer/
-│   ├── index.html          # 主界面
+│   ├── index.html          # 主界面（含 CSP 配置）
 │   ├── css/
+│   │   └── style.css       # 样式文件
 │   └── js/
 │       ├── app.js          # Three.js 主逻辑
-│       ├── emotion-system.js
-│       └── ...
+│       ├── app-gateway-init.js  # Gateway 连接初始化
+│       ├── model-loader.js      # GLB 模型加载器
+│       ├── particle-system-enhanced.js  # 增强粒子系统
+│       ├── tool-mappings.js       # 工具调用映射表
+│       ├── topic-generator.js     # 话题生成器
+│       ├── color-renderer.js      # 颜色渲染器（系统负载）
+│       ├── inner-voice.js         # 内心戏管理器
+│       └── gateway/
+│           └── minimal-gateway-client.js  # 精简 Gateway 客户端
+├── models/
+│   └── gray_wolf.glb       # 默认 3D 模型（灰太狼）
 ├── python/
-│   ├── server.py           # Python 后端
-│   └── monitor.py          # 系统监控
+│   ├── server.py           # WebSocket 服务器（端口 8765）
+│   └── monitor.py          # 系统监控（CPU/内存/温度）
 └── assets/
-    └── lobster.png         # 图标
+    └── lobster.png         # 哈基虾图标
 ```
 
 ---
@@ -118,21 +126,32 @@ openclaw gateway restart
    - 右键菜单：功能菜单
    - F12：老板键（隐藏/显示）
 
-### v3.2.2 新功能
+### v3.2.8 新功能（2026-03-19）
 
 **系统负载监控**：
 - 实时显示 CPU/内存/GPU 使用率
 - 4 级颜色指示：🔵空闲 → 🌟忙碌 → 🟠紧张 → 🔴夯爆了
-- 右键菜单 → "状态" 进入实时监控模式
+- 右键菜单 → "系统状态" 进入实时监控模式
 
 **工具事件驱动**：
 - OpenClaw 调用工具时触发对应动作和特效
-- 支持工具：read/write/edit/exec/web_fetch/browser
-- 气泡持续显示工具状态，直到新工具调用
+- 支持工具：read/write/edit/exec/web_fetch/openclaw-tavily-search/agent-browser
+- 气泡显示工具状态，工具完成后自动隐藏
 
 **特效系统**：
 - 6 种基础动作：wiggle/bounce/shake/stretch/spiral/jump
 - 5 种粒子特效：星光/拖尾/电火花/光环/代码雨
+
+**气泡优先级系统**：
+- 话题气泡：永久显示，直到被覆盖
+- 系统状态：永久显示（监控模式），实时更新
+- 工具调用：临时显示，工具完成后隐藏
+- 后来者居上：新气泡覆盖旧气泡
+
+**项目精简**：
+- 删除不必要的文档和工具目录
+- 保留 models/ 作为用户示例
+- 清理代码注释和调试日志
 
 ### 停止
 
@@ -197,8 +216,16 @@ npm run python
 ### Electron 窗口未显示
 
 1. 检查任务栏是否有窗口
-2. 按 F12 尝试显示/隐藏
-3. 查看 `logs/` 目录下的错误日志
+2. 按 F12 或 Ctrl+Shift+I 打开 DevTools
+3. 查看 Console 是否有错误日志
+4. 检查 `renderer/index.html` 的 CSP 配置是否正确
+
+### 3D 模型不显示/无颜色
+
+1. 打开 DevTools 查看 Console 错误
+2. 检查 `import` 语句是否在文件顶部（ES Module 要求）
+3. 确认 CSP 允许 `blob:` 和 `data:` URL
+4. 检查 GLB 模型文件是否存在且有效
 
 ### Python 后端无法启动
 
@@ -209,6 +236,38 @@ npm run python
 ---
 
 ## 📝 更新日志
+
+### v3.2.8 (2026-03-19)
+- ✅ 精简项目结构（删除 docs/tools/logs）
+- ✅ 清理代码注释和调试日志
+- ✅ 优化气泡优先级系统（后来者居上）
+- ✅ 更新 README.md 文档
+
+### v3.2.7 (2026-03-19)
+- ✅ 修复 3D 渲染问题（CSP 配置、import 位置）
+- ✅ 修复 WebSocket 连接问题（只连 8765 端口）
+- ✅ 添加详细初始化日志
+- ✅ 启用 DevTools 便于调试
+
+### v3.2.6 (2026-03-18)
+- ✅ 删除旧的情绪系统和粒子系统
+- ✅ 使用增强版粒子系统
+- ✅ 优化话题生成器
+
+### v3.2.5 (2026-03-17)
+- ✅ 修复重复启动和端口冲突
+- ✅ 增加 Gateway 工具事件框架
+
+### v3.2.4 (2026-03-16)
+- ✅ 修复 Python 语法错误
+- ✅ 移除无效事件监听
+
+### v3.2.3 (2026-03-15)
+- ✅ 全面清理注释和空行
+
+### v3.2.2 (2026-03-15)
+- ✅ 增强系统负载颜色对比度
+- ✅ 实施工具事件驱动动画
 
 ### v1.0.0 (2026-03-12)
 - ✅ 初始 Extension 版本
