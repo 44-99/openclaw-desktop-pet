@@ -148,18 +148,25 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      devTools: false,      // 禁用开发者工具
+      devTools: true,       // ⭐ 启用开发者工具
       acceleratorWorksWhenHidden: false,
     },
   });
 
-  // 禁用开发者工具（生产模式）
-  // mainWindow.webContents.openDevTools();
+  // ⭐ 启用开发者工具（调试渲染问题）
+  mainWindow.webContents.openDevTools();
+  console.log('[Electron] DevTools 已启用');
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
-  // 禁用开发者工具
-  // mainWindow.webContents.openDevTools();
+  // ⭐ 监听渲染进程错误
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('❌ Render process gone:', details);
+  });
+  
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('❌ Failed to load:', errorCode, errorDescription);
+  });
 
   // 窗口关闭时
   mainWindow.on('closed', () => {

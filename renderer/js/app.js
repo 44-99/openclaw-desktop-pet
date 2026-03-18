@@ -1,16 +1,39 @@
+// ==================== 全局错误捕获 ====================
+window.addEventListener('error', (event) => {
+  console.error('❌ [GLOBAL ERROR]', event.message);
+  console.error('📍 Location:', event.filename, event.lineno, event.colno);
+  console.error('📚 Stack:', event.error?.stack);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('❌ [UNHANDLED REJECTION]', event.reason);
+});
+
+console.log('🦞 [app.js] 模块开始加载...');
+
 // ==================== 导入 Three.js ====================
 import * as THREE from 'three';
+console.log('✅ [app.js] Three.js 导入成功');
+
 // ==================== 导入现有模块 ====================
 import { TopicGenerator } from './topic-generator.js';
 import { ColorRenderer } from './color-renderer.js';
 import { InnerVoiceManager } from './inner-voice.js';
+console.log('✅ [app.js] 基础模块导入成功');
+
 // ==================== 导入 GLB 模型加载 ====================
 import { ModelLoader } from './model-loader.js';
+console.log('✅ [app.js] ModelLoader 导入成功');
+
 // ==================== 导入增强粒子系统 ====================
 import { ParticleSystemManagerEnhanced, CodeRainParticle } from './particle-system-enhanced.js';
+console.log('✅ [app.js] ParticleSystemManagerEnhanced 导入成功');
+
 // ==================== 导入 Gateway 连接器 ====================
 import { MinimalGatewayClient } from './gateway/minimal-gateway-client.js';
 import { getToolConfig, getToolColor } from './tool-mappings.js';
+import { initGatewayConnection } from './app-gateway-init.js';
+console.log('✅ [app.js] Gateway 模块导入成功');
 // 全局变量
 let scene, camera, renderer, pet;
 let petParts = {};
@@ -546,28 +569,33 @@ document.addEventListener('click', () => {
   if (menu) menu.classList.add('hidden');
 });
 // ==================== WebSocket 连接 ====================
+// ⭐ 修复：只连接 8765 端口，避免端口扫描错误日志
 function connectWebSocket() {
   if (websocket) {
     try { websocket.close(); } catch(e) {}
   }
   
-  const ports = [8765, 8766, 8767, 8768, 8769, 8770];
-  let currentPortIndex = 0;
+  const PYTHON_PORT = 8765;  // 固定端口
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 5;  // 最多 5 次重连
+  const RECONNECT_DELAY = 3000;  // 3 秒重连间隔
   
   function tryConnect() {
-    if (currentPortIndex >= ports.length) {
-      
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.log('⚠️ WebSocket 重连次数已达上限，停止连接');
       simulateSystemStatus();
       return;
     }
     
-    const port = ports[currentPortIndex];
+    reconnectAttempts++;
+    console.log(`🔌 尝试连接 Python WebSocket (ws://localhost:${PYTHON_PORT}) - 第 ${reconnectAttempts} 次`);
     
     try {
-      websocket = new WebSocket(`ws://localhost:${port}`);
+      websocket = new WebSocket(`ws://localhost:${PYTHON_PORT}`);
       
       websocket.onopen = () => {
-        // hideLoading() 已在 init() 中调用，此处移除
+        console.log('✅ Python WebSocket 连接成功');
+        reconnectAttempts = 0;  // 重置重连计数
       };
       
       websocket.onmessage = (event) => {
@@ -584,14 +612,21 @@ function connectWebSocket() {
       };
       
       websocket.onclose = () => {
-        currentPortIndex++;
-        if (currentPortIndex < ports.length) setTimeout(tryConnect, 300);
+        console.log('⚠️ Python WebSocket 连接关闭');
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          console.log(`⏳ ${RECONNECT_DELAY/1000}秒后重连...`);
+          setTimeout(tryConnect, RECONNECT_DELAY);
+        }
       };
       
-      websocket.onerror = () => { currentPortIndex++; };
+      websocket.onerror = (error) => {
+        console.error('❌ Python WebSocket 错误:', error);
+      };
     } catch(e) {
-      currentPortIndex++;
-      tryConnect();
+      console.error('❌ WebSocket 连接失败:', e);
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        setTimeout(tryConnect, RECONNECT_DELAY);
+      }
     }
   }
   
@@ -1073,53 +1108,79 @@ function processToolEvent(toolData) {
   }
 }
 
-// ==================== Gateway 连接（使用精简版客户端）====================
-import { initGatewayConnection } from './app-gateway-init.js';
-
 // ==================== 初始化 ====================
 async function init() {
+  console.log('🚀 [init] 开始初始化...');
   
-  
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 0.6, 5);  //
-  
-  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000, 0);
-  renderer.domElement.style.background = 'transparent';
-  document.getElementById('canvas-container').appendChild(renderer.domElement);
-  
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-  scene.add(ambientLight);
-  
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(3, 5, 5);
-  scene.add(directionalLight);
-  
-  const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
-  backLight.position.set(-3, 2, -3);
-  scene.add(backLight);
-  
-  //
-  await loadGLBModel();
-  
-  await initModules();
-  setupMouseControls();
-  connectWebSocket();
-  initGatewayConnection();  // ⭐ 新增：Gateway 连接（不阻塞初始化）
-  
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+  try {
+    // 1. 创建场景
+    console.log('📦 [init] 创建 Three.js 场景...');
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0.6, 5);
+    console.log('✅ [init] 场景和相机创建成功');
+    
+    // 2. 创建渲染器
+    console.log('🎨 [init] 创建 WebGL 渲染器...');
+    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-  
-  animate();
-  
-  // ⭐ 修复：初始化完成后立即隐藏 loading，不等 WebSocket 连接
-  hideLoading();
-  
+    renderer.setClearColor(0x000000, 0);
+    renderer.domElement.style.background = 'transparent';
+    
+    const canvasContainer = document.getElementById('canvas-container');
+    if (!canvasContainer) {
+      throw new Error('❌ canvas-container 元素不存在！');
+    }
+    canvasContainer.appendChild(renderer.domElement);
+    console.log('✅ [init] 渲染器创建并添加到 DOM');
+    
+    // 3. 添加灯光
+    console.log('💡 [init] 添加灯光...');
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(3, 5, 5);
+    scene.add(directionalLight);
+    
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    backLight.position.set(-3, 2, -3);
+    scene.add(backLight);
+    console.log('✅ [init] 灯光添加完成');
+    
+    // 4. 加载模型
+    console.log('🦞 [init] 加载 3D 模型...');
+    await loadGLBModel();
+    console.log('✅ [init] 模型加载完成');
+    
+    // 5. 初始化模块
+    console.log('🔧 [init] 初始化模块...');
+    await initModules();
+    setupMouseControls();
+    connectWebSocket();
+    initGatewayConnection();
+    console.log('✅ [init] 模块初始化完成');
+    
+    // 6. 窗口大小监听
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    // 7. 开始渲染循环
+    console.log('🎬 [init] 开始渲染循环...');
+    animate();
+    
+    // 8. 隐藏 loading
+    console.log('👋 [init] 隐藏 loading...');
+    hideLoading();
+    console.log('✅ [init] 初始化完成！');
+    
+  } catch (error) {
+    console.error('❌ [init] 初始化失败:', error);
+    console.error('📚 Stack:', error.stack);
+  }
 }
 //
 let disableAnimationUpdate = false;

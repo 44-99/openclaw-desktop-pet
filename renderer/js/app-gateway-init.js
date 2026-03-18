@@ -2,12 +2,6 @@
  * 初始化 Gateway WebSocket 连接 - 精简版
  * 
  * 注意：此函数需要在全局 gatewayClient 变量定义后调用
- */
-
-// 声明外部变量（在 app.js 中定义）
-/* eslint-disable no-unused-vars */
-/* global gatewayClient, handleGatewayToolCall */
-/* eslint-enable no-unused-vars */
  * 
  * 实现完整的 Gateway 握手协议：
  * 1. WebSocket 连接
@@ -16,7 +10,13 @@
  * 4. 发送 connect 帧
  * 5. 监听工具事件
  */
-async function initGatewayConnection() {
+
+// 声明外部变量（在 app.js 中定义）
+/* eslint-disable no-unused-vars */
+/* global gatewayClient, handleGatewayToolCall */
+/* eslint-enable no-unused-vars */
+
+export async function initGatewayConnection() {
   try {
     // 从 Electron 获取 Gateway Token
     let gatewayToken = null;
