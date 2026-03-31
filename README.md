@@ -85,17 +85,65 @@ openclaw gateway restart
 
 ## ⚙️ 配置
 
-在 `~/.openclaw/openclaw.json` 中添加：
+### 正确配置方式（重要！）
+
+在 `~/.openclaw/openclaw.json` 的 **`plugins.entries`** 中添加：
 
 ```json
 {
-  "extensions": {
+  "plugins": {
+    "entries": {
+      "openclaw-desktop-pet": {
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+### ⚠️ 常见错误
+
+**错误**：在根级别使用 `extensions` key（OpenClaw 不识别，会报错）
+
+```json
+// ❌ 错误配置
+{
+  "extensions": {  // ← 这会报错：Unrecognized key: "extensions"
     "openclaw-desktop-pet": {
-      "enabled": true,
-      "alwaysOnTop": true,
-      "transparent": true,
-      "theme": "default",
-      "performanceMode": "normal"
+      "enabled": true
+    }
+  }
+}
+```
+
+**正确**：使用 `plugins.entries`
+
+```json
+// ✅ 正确配置
+{
+  "plugins": {
+    "entries": {
+      "openclaw-desktop-pet": {
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+### 完整配置示例
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-desktop-pet": {
+        "enabled": true,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "theme": "default",
+        "performanceMode": "normal"
+      }
     }
   }
 }
@@ -130,7 +178,7 @@ openclaw gateway restart
 
 **系统负载监控**：
 - 实时显示 CPU/内存/GPU 使用率
-- 4 级颜色指示：🔵空闲 → 🌟忙碌 → 🟠紧张 → 🔴夯爆了
+- 4 级颜色指示：🔵空闲 → 🌟忙碌 → 紧张 → 🔴夯爆了
 - 右键菜单 → "系统状态" 进入实时监控模式
 
 **工具事件驱动**：
@@ -209,9 +257,9 @@ npm run python
 
 ### Extension 未加载
 
-1. 检查 `~/.openclaw/openclaw.json` 中是否启用
+1. 检查 `~/.openclaw/openclaw.json` 中是否启用（**使用 `plugins.entries`，不是 `extensions`**）
 2. 查看 Gateway 日志：`openclaw gateway logs`
-3. 确认 `openclaw.plugin.json` 格式正确
+3. 确认 `package.json` 中的 `openclaw.extensions` 配置正确
 
 ### Electron 窗口未显示
 
@@ -241,7 +289,7 @@ npm run python
 - ✅ 精简项目结构（删除 docs/tools/logs）
 - ✅ 清理代码注释和调试日志
 - ✅ 优化气泡优先级系统（后来者居上）
-- ✅ 更新 README.md 文档
+- ✅ 更新 README.md 文档（修复配置示例）
 
 ### v3.2.7 (2026-03-19)
 - ✅ 修复 3D 渲染问题（CSP 配置、import 位置）
