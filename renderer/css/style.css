@@ -4,34 +4,50 @@
   box-sizing: border-box;
 }
 
-body {
+html, body {
+  width: 300px;
+  height: 300px;
   overflow: hidden;
-  background: transparent; /* 完全透明背景 */
+  background: rgba(0, 0, 0, 0.01);
+}
+
+body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   user-select: none;
-  /* 移除 -webkit-app-region: drag，让整个窗口都可以交互 */
   will-change: transform;
   transform: translateZ(0);
 }
 
+/* ⭐ 移除点击捕获层，让透明区域穿透 */
+
 #canvas-container {
-  width: 100vw;
-  height: 100vh;
   position: absolute;
   top: 0;
   left: 0;
-  cursor: pointer;
-  transition: cursor 0.2s;
+  width: 300px;
+  height: 300px;
+  cursor: default;
+  background: transparent;
+  z-index: 2;
+}
+
+#canvas-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: auto;
 }
 
 #canvas-container:active {
   cursor: grabbing;
 }
 
-/* 对话气泡 - 居中显示在哈基虾上方 */
 #speech-bubble {
-  position: absolute;
-  top: 10px;  /* ⭐ 气泡 top：50px → 10px（更靠近顶部） */
+  position: fixed;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   background: white;
@@ -42,13 +58,13 @@ body {
   max-width: 240px;
   box-shadow: 0 4px 16px rgba(255, 102, 102, 0.4);
   animation: bubble-appear 0.3s ease-out;
-  z-index: 9999; /* 最高层级 */
+  z-index: 9999;
   pointer-events: none;
   opacity: 1;
 }
 
 #speech-bubble.hidden {
-  display: none !important; /* 完全隐藏，不占空间 */
+  display: none !important;
 }
 
 #speech-bubble.visible {
@@ -74,53 +90,12 @@ body {
 }
 
 @keyframes bubble-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-/* 状态指示器 */
-#status-indicator {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  padding: 6px 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #666;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  pointer-events: none; /* 让状态指示器不阻挡点击 */
-}
-
-#status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4CAF50;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-/* 右键菜单 */
 #context-menu {
-  position: absolute;
+  position: fixed;
   background: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -151,9 +126,8 @@ body {
   margin: 8px 0;
 }
 
-/* 加载指示器 */
 #loading {
-  position: absolute;
+  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -178,16 +152,14 @@ body {
   100% { transform: rotate(360deg); }
 }
 
-/* 状态颜色 */
 .status-idle { background: #4CAF50; }
 .status-normal { background: #2196F3; }
 .status-busy { background: #FF9800; }
 .status-high { background: #F44336; }
 .status-critical { background: #9C27B0; }
 
-/* ========== 内心戏气泡（头顶位置） ========== */
 .inner-voice-bubble {
-  position: absolute;
+  position: fixed;
   top: 10%;
   left: 50%;
   transform: translateX(-50%) translateY(-20px);

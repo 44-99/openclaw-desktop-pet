@@ -49,4 +49,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onGatewayEvent: (callback) => {
     ipcRenderer.on('gateway-event', (event, message) => callback(message));
   },
+
+  // ⭐ 动态控制鼠标穿透
+  setIgnoreMouse: (ignore) => {
+    ipcRenderer.send('set-ignore-mouse', ignore);
+  },
 });
